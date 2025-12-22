@@ -6,454 +6,247 @@
   <title>LinkedIn Cleaner</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Old+Standard+TT:wght@400&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Old+Standard+TT:wght@400&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
   <style>
-    :root {
-      --background: #FCF9F5;
-      --foreground: #111827;
-      --accent: #1AB394;
-      --accent-dark: #149076;
-      --card: #FFFFFF;
-      --border: rgba(17, 24, 39, 0.08);
-      --muted: #5C6274;
-      --radius: 1.25rem;
-      --shadow: 0 25px 55px rgba(23, 23, 23, 0.08);
-    }
-
     * {
+      margin: 0;
+      padding: 0;
       box-sizing: border-box;
     }
 
+    :root {
+      --bg: #FCF9F5;
+      --card: #FFFFFF;
+      --accent: #1AB394;
+      --accent-dark: #159a80;
+      --text: #111827;
+      --muted: #6B7280;
+      --border: #E5E7EB;
+    }
+
     body {
-      margin: 0;
-      min-height: 100vh;
-      width: 100%;
-      font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-      background: radial-gradient(circle at top, rgba(255, 255, 255, 0.8), rgba(252, 249, 245, 0.8)), var(--background);
-      color: var(--foreground);
-      display: flex;
-      justify-content: center;
-      padding: 24px 0 36px;
+      width: 380px;
+      font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+      background: var(--bg);
+      color: var(--text);
     }
 
-    main {
-      width: min(480px, 100%);
-      padding: 0 16px;
-    }
-
-    .app-shell {
-      background: var(--background);
-      border-radius: 2rem;
-      border: 1px solid rgba(26, 179, 148, 0.18);
-      padding: 32px 28px 40px;
-      box-shadow: var(--shadow);
-      position: relative;
-      overflow: hidden;
-    }
-
-    .hero {
-      display: flex;
-      flex-direction: column;
-      gap: 22px;
-    }
-
-    .hero::after {
-      content: '';
-      position: absolute;
-      inset: auto -40px -160px auto;
-      width: 200px;
-      height: 200px;
-      background: radial-gradient(circle, rgba(26, 179, 148, 0.3), transparent 70%);
-      pointer-events: none;
-    }
-
-    .hero-content {
-      position: relative;
-      z-index: 1;
-    }
-
-    .eyebrow {
-      font-size: 12px;
-      letter-spacing: 0.2em;
-      text-transform: uppercase;
-      color: var(--accent);
-      margin-bottom: 6px;
-    }
-
-    .hero h1 {
-      font-family: 'Old Standard TT', serif;
-      font-size: 36px;
-      line-height: 1.2;
-      margin-bottom: 12px;
-    }
-
-    .hero p {
-      font-size: 15px;
-      line-height: 1.7;
-      color: var(--muted);
-      margin: 0;
-    }
-
-    .hero-card {
-      position: relative;
-      background: linear-gradient(135deg, #ffffff, #f5f2ed);
-      border-radius: 1.5rem;
+    .container {
       padding: 24px;
-      border: 1px solid rgba(255, 255, 255, 0.6);
-      box-shadow: 0 10px 35px rgba(22, 22, 22, 0.08);
-      backdrop-filter: blur(6px);
     }
 
-    .hero-card > * {
-      position: relative;
-      z-index: 1;
-    }
-
-    .status-row {
+    /* Header */
+    .header {
       display: flex;
       align-items: center;
       justify-content: space-between;
-      gap: 12px;
-      margin-bottom: 18px;
+      margin-bottom: 20px;
     }
 
-    .status-pill {
-      font-size: 12px;
+    .logo {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .logo-icon {
+      width: 36px;
+      height: 36px;
+      background: linear-gradient(135deg, var(--accent), var(--accent-dark));
+      border-radius: 10px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 18px;
+    }
+
+    .logo-text {
+      font-family: 'Old Standard TT', serif;
+      font-size: 18px;
+      font-weight: 400;
+    }
+
+    .status-badge {
+      font-size: 11px;
       font-weight: 600;
-      letter-spacing: 0.05em;
-      padding: 6px 16px;
-      border-radius: 999px;
-      background: linear-gradient(120deg, rgba(26,179,148,0.2), rgba(26,179,148,0.8));
+      padding: 5px 12px;
+      border-radius: 20px;
+      background: rgba(26, 179, 148, 0.15);
       color: var(--accent);
-      border: 1px solid rgba(26, 179, 148, 0.4);
     }
 
-    .status-note {
+    .status-badge.paused {
+      background: rgba(107, 114, 128, 0.15);
+      color: var(--muted);
+    }
+
+    /* Toggle Card */
+    .toggle-card {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      padding: 16px;
+      margin-bottom: 16px;
+    }
+
+    .toggle-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      cursor: pointer;
+    }
+
+    .toggle-info h2 {
+      font-size: 15px;
+      font-weight: 600;
+      margin-bottom: 2px;
+    }
+
+    .toggle-info p {
       font-size: 12px;
       color: var(--muted);
     }
 
-    .filter-toggle {
-      display: flex;
-      align-items: center;
-      gap: 16px;
-      background: rgba(255, 255, 255, 0.8);
-      border-radius: 1rem;
-      padding: 12px 16px;
-      border: 1px solid rgba(17, 24, 39, 0.1);
-      cursor: pointer;
-      transition: border 0.3s ease, transform 0.3s ease;
-    }
-
-    .filter-toggle:hover {
-      border-color: rgba(26, 179, 148, 0.6);
-      transform: translateY(-1px);
-    }
-
-    .filter-toggle.active {
-      border-color: rgba(26, 179, 148, 0.8);
-    }
-
-    .toggle-track {
-      width: 50px;
-      height: 26px;
-      border-radius: 999px;
-      background: rgba(0, 0, 0, 0.08);
+    .toggle-switch {
+      width: 48px;
+      height: 28px;
+      background: #D1D5DB;
+      border-radius: 14px;
       position: relative;
-      transition: background 0.3s ease;
+      transition: background 0.2s ease;
+      flex-shrink: 0;
     }
 
-    .filter-toggle.active .toggle-track {
-      background: linear-gradient(120deg, var(--accent), var(--accent-dark));
+    .toggle-switch.active {
+      background: var(--accent);
     }
 
     .toggle-knob {
       position: absolute;
       top: 3px;
       left: 3px;
-      width: 20px;
-      height: 20px;
-      border-radius: 50%;
+      width: 22px;
+      height: 22px;
       background: white;
-      box-shadow: 0 4px 10px rgba(15, 23, 42, 0.2);
-      transition: transform 0.3s ease;
+      border-radius: 50%;
+      box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+      transition: transform 0.2s ease;
     }
 
-    .filter-toggle.active .toggle-knob {
-      transform: translateX(24px);
+    .toggle-switch.active .toggle-knob {
+      transform: translateX(20px);
     }
 
-    .toggle-copy {
-      display: flex;
-      flex-direction: column;
-    }
-
-    .toggle-copy strong {
-      font-size: 16px;
-      line-height: 1.2;
-      display: block;
-    }
-
-    .toggle-copy span {
-      font-size: 13px;
-      color: var(--muted);
-    }
-
-    .status-copy {
-      font-size: 13px;
-      color: var(--muted);
-      margin-top: 14px;
-    }
-
-    .cards-grid {
-      margin-top: 32px;
-      display: grid;
-      gap: 18px;
-    }
-
-    .card {
-      border-radius: 1.25rem;
-      border: 1px solid var(--border);
+    /* ICP Card */
+    .icp-card {
       background: var(--card);
-      padding: 20px;
-      box-shadow: 0 10px 25px rgba(15, 23, 42, 0.08);
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      padding: 16px;
     }
 
-    .card h2 {
-      font-family: 'Old Standard TT', serif;
-      font-size: 28px;
-      margin-top: 4px;
-      margin-bottom: 6px;
-    }
-
-    .card-copy {
+    .icp-card h3 {
       font-size: 14px;
+      font-weight: 600;
+      margin-bottom: 4px;
+    }
+
+    .icp-card p {
+      font-size: 12px;
       color: var(--muted);
-      margin-bottom: 16px;
+      margin-bottom: 12px;
     }
 
     textarea {
       width: 100%;
-      border-radius: 14px;
-      border: 1px solid rgba(17, 24, 39, 0.12);
-      padding: 12px 14px;
-      font-size: 14px;
-      min-height: 90px;
-      resize: none;
+      min-height: 72px;
+      padding: 12px;
+      border: 1px solid var(--border);
+      border-radius: 10px;
       font-family: inherit;
-      color: var(--foreground);
-      background: #fdfaf8;
-      transition: border 0.2s ease, box-shadow 0.2s ease;
+      font-size: 13px;
+      resize: none;
+      background: #FAFAFA;
+      color: var(--text);
+      transition: border-color 0.2s, box-shadow 0.2s;
     }
 
     textarea:focus {
       outline: none;
       border-color: var(--accent);
-      box-shadow: 0 0 0 3px rgba(26, 179, 148, 0.15);
+      box-shadow: 0 0 0 3px rgba(26, 179, 148, 0.1);
     }
 
-    .form-actions {
+    textarea::placeholder {
+      color: #9CA3AF;
+    }
+
+    .icp-footer {
       display: flex;
       align-items: center;
       justify-content: space-between;
-      gap: 12px;
-      margin-top: 14px;
+      margin-top: 12px;
     }
 
-    .btn {
+    .btn-save {
+      background: var(--accent);
+      color: white;
       border: none;
-      border-radius: 999px;
-      padding: 10px 18px;
+      padding: 10px 20px;
+      border-radius: 8px;
       font-size: 13px;
       font-weight: 600;
       cursor: pointer;
-      transition: transform 0.2s ease, box-shadow 0.2s ease;
+      transition: background 0.2s, transform 0.1s;
     }
 
-    .btn-primary {
-      background: linear-gradient(120deg, var(--accent), var(--accent-dark));
-      color: #fff;
-      box-shadow: 0 8px 20px rgba(26, 179, 148, 0.35);
+    .btn-save:hover {
+      background: var(--accent-dark);
     }
 
-    .btn-primary:hover {
-      transform: translateY(-1px);
+    .btn-save:active {
+      transform: scale(0.98);
     }
 
     .save-status {
-      font-size: 13px;
-      color: var(--muted);
-      min-width: 70px;
-      text-align: right;
-    }
-
-    .stats-card h2 {
-      margin-bottom: 10px;
-    }
-
-    .stat-grid {
-      display: grid;
-      grid-template-columns: repeat(2, minmax(0, 1fr));
-      gap: 16px;
-    }
-
-    .stat {
-      background: #f7f3ef;
-      padding: 12px;
-      border-radius: 12px;
-      border: 1px solid rgba(17, 24, 39, 0.08);
-    }
-
-    .stat-value {
-      font-size: 22px;
-      font-weight: 600;
-      margin: 0 0 4px;
-    }
-
-    .stat-label {
       font-size: 12px;
-      letter-spacing: 0.1em;
-      text-transform: uppercase;
-      color: var(--muted);
-    }
-
-    .chip-row {
-      margin-top: 16px;
-      display: flex;
-      flex-wrap: wrap;
-      gap: 10px;
-    }
-
-    .chip {
-      border-radius: 999px;
-      padding: 6px 12px;
-      background: rgba(26, 179, 148, 0.12);
-      color: var(--accent-dark);
-      font-size: 12px;
-      font-weight: 600;
-    }
-
-    .tip-card ul {
-      list-style: none;
-      padding: 0;
-      margin: 12px 0 0 0;
-      display: flex;
-      flex-direction: column;
-      gap: 6px;
-    }
-
-    .tip-card li {
-      font-size: 13px;
-      color: var(--muted);
-      display: flex;
-      align-items: center;
-      gap: 8px;
-    }
-
-    .tip-card li::before {
-      content: '▹';
       color: var(--accent);
-      font-size: 14px;
-    }
-
-    @media (max-width: 480px) {
-      .app-shell {
-        padding: 28px 20px 34px;
-      }
-
-      .hero h1 {
-        font-size: 32px;
-      }
-
-      .card h2 {
-        font-size: 24px;
-      }
+      font-weight: 500;
     }
   </style>
 </head>
 <body>
-  <main>
-    <div class="app-shell">
-      <div class="hero">
-        <div class="hero-content">
-          <p class="eyebrow">LinkedIn Cleaner</p>
-          <h1>Only the people you care about, front and center.</h1>
-          <p>Apply a subtle layer of focus across your LinkedIn feed so every scroll brings you closer to engineers, founders, and experts you actually want to learn from.</p>
+  <div class="container">
+    <header class="header">
+      <div class="logo">
+        <div class="logo-icon">🎯</div>
+        <span class="logo-text">LinkedIn Cleaner</span>
+      </div>
+      <span class="status-badge" id="status-badge">Active</span>
+    </header>
+
+    <div class="toggle-card">
+      <div class="toggle-row" id="filter-toggle" role="switch" aria-checked="true" tabindex="0">
+        <div class="toggle-info">
+          <h2 id="toggle-title">Filter Enabled</h2>
+          <p id="toggle-sub">Non-matching posts are blurred</p>
         </div>
-
-        <div class="hero-card">
-          <div class="status-row">
-            <span class="status-pill" id="status-pill">Filter Active</span>
-            <span class="status-note" id="status-note">Prioritizing your ICP keywords</span>
-          </div>
-
-          <div class="filter-toggle active" id="filter-toggle" role="switch" aria-checked="true" tabindex="0">
-            <div class="toggle-track">
-              <span class="toggle-knob"></span>
-            </div>
-            <div class="toggle-copy">
-              <strong id="toggle-title">Filtering on</strong>
-              <span id="toggle-sub">Non-ICP posts are blurred</span>
-            </div>
-          </div>
-
-          <p class="status-copy">Flip the switch to pause the filter anytime. Changes take effect instantly on all open LinkedIn tabs.</p>
+        <div class="toggle-switch active" id="toggle-switch">
+          <div class="toggle-knob"></div>
         </div>
       </div>
-
-      <section class="cards-grid">
-        <article class="card">
-          <div>
-            <p class="eyebrow">ICP Focus</p>
-            <h2>Define the connections that matter</h2>
-          </div>
-          <p class="card-copy">Add titles, industries, or keywords and the cleaner adjusts every action in real-time.</p>
-          <textarea id="icp-input" placeholder="e.g. AI Research, Startup Founders, Growth Marketing Leads"></textarea>
-          <div class="form-actions">
-            <button class="btn btn-primary" id="save-icp">Save ICP</button>
-            <span class="save-status" id="save-status" aria-live="polite"></span>
-          </div>
-        </article>
-
-        <article class="card stats-card">
-          <h2>Live Signals</h2>
-          <div class="stat-grid">
-            <div class="stat">
-              <p class="stat-value" id="stat-processed">Realtime</p>
-              <p class="stat-label">Profiles filtered</p>
-            </div>
-            <div class="stat">
-              <p class="stat-value" id="stat-engaged">24/7</p>
-              <p class="stat-label">Filter uptime</p>
-            </div>
-            <div class="stat">
-              <p class="stat-value" id="stat-icp">Custom</p>
-              <p class="stat-label">ICP saved</p>
-            </div>
-            <div class="stat">
-              <p class="stat-value" id="stat-support">Self-serve</p>
-              <p class="stat-label">No login needed</p>
-            </div>
-          </div>
-          <div class="chip-row">
-            <span class="chip">Privacy-first</span>
-            <span class="chip">LinkedIn-only</span>
-            <span class="chip">Instant preview</span>
-          </div>
-        </article>
-
-        <article class="card tip-card">
-          <p class="eyebrow">Best practices</p>
-          <h2>Keep the filter sharp</h2>
-          <ul>
-            <li>Refresh your ICP every week to keep pace with new hiring streaks.</li>
-            <li>Toggle off while scouting for broader opportunities.</li>
-            <li>Open LinkedIn tabs will pick up status updates automatically.</li>
-          </ul>
-        </article>
-      </section>
     </div>
-  </main>
+
+    <div class="icp-card">
+      <h3>Target Audience (ICP)</h3>
+      <p>Describe who you want to see in your feed</p>
+      <textarea id="icp-input" placeholder="e.g. Software Engineers, AI Researchers, Startup Founders, Product Managers"></textarea>
+      <div class="icp-footer">
+        <button class="btn-save" id="save-icp">Save</button>
+        <span class="save-status" id="save-status"></span>
+      </div>
+    </div>
+  </div>
 
   <script src="../scripts/config.js"></script>
   <script src="../scripts/popup.js"></script>
