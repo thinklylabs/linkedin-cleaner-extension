@@ -80,11 +80,20 @@ function extractProfileData(postElement) {
 
     const postContainer = postElement.closest('.feed-shared-update-v2');
     
-    // Extract post text content
+    // Extract post text content - try multiple selectors
     const postTextEl = postContainer?.querySelector('.feed-shared-text-view__text-view span[aria-hidden="true"]') ||
                        postContainer?.querySelector('.feed-shared-update-v2__description span[aria-hidden="true"]') ||
-                       postContainer?.querySelector('.update-components-text span[aria-hidden="true"]');
-    const postText = postTextEl?.textContent.trim() || '';
+                       postContainer?.querySelector('.update-components-text span[aria-hidden="true"]') ||
+                       postContainer?.querySelector('.feed-shared-text-view') ||
+                       postContainer?.querySelector('[data-test-id="main-feed-activity-card__commentary"]');
+    
+    // Get text from element, handling nested spans
+    let postText = '';
+    if (postTextEl) {
+        // Try to get all text content, including nested elements
+        postText = postTextEl.innerText || postTextEl.textContent || '';
+        postText = postText.trim();
+    }
 
     // Check for promoted/sponsored content
     const isPromoted =
@@ -129,7 +138,12 @@ function blurPost(postElement) {
     wrapper.style.transition = 'all 0.3s ease';
 
     const btn = document.createElement('button');
-    btn.textContent = 'Show Post';
+    btn.innerHTML = `
+        <span style="display: flex; align-items: center; gap: 8px; white-space: nowrap;">
+            <span>Show Post</span>
+            <span style="opacity: 0.9; font-size: 11px; font-weight: 500; letter-spacing: 0.3px;">authr</span>
+        </span>
+    `;
     btn.style.cssText = `
         position: absolute;
         top: 50%;
@@ -139,12 +153,12 @@ function blurPost(postElement) {
         background: #1AB394;
         color: white;
         border: none;
-        padding: 10px 20px;
+        padding: 10px 22px;
         border-radius: 20px;
         cursor: pointer;
         font-size: 13px;
         font-weight: 600;
-        font-family: -apple-system, BlinkMacSystemFont, sans-serif;
+        font-family: -apple-system, BlinkMacSystemFont, 'DM Sans', sans-serif;
         box-shadow: 0 2px 8px rgba(26, 179, 148, 0.3);
         transition: all 0.2s ease;
     `;
@@ -199,7 +213,7 @@ function unblurAllPosts() {
         if (wrapper) {
             wrapper.style.filter = '';
         }
-        if (button && button.textContent === 'Show Post') {
+        if (button && (button.textContent.includes('Show Post') || button.innerHTML.includes('Show Post'))) {
             button.remove();
         }
 
@@ -220,37 +234,28 @@ async function analyzeWithGemini(profileData, apiKey, customICP) {
             return { shouldShow: true };
         }
 
-        // Well-defined ICP matching prompt with post content analysis
-        const postPreview = profileData.postText ? profileData.postText.substring(0, 300) : 'No post content available';
+        // Improved ICP matching prompt
+        const postPreview = profileData.postText ? profileData.postText.substring(0, 400).trim() : '';
         
-        const prompt = `Analyze this LinkedIn profile and post to determine if it matches the target audience.
+        const prompt = `You are filtering LinkedIn posts to show only content from your target audience.
 
-PROFILE DATA:
-- Name: ${profileData.name || 'Unknown'}
-- Professional Headline: ${profileData.headline || 'Not available'}
-
-POST CONTENT (first few lines):
-${postPreview}
-
-TARGET AUDIENCE (ICP):
+TARGET AUDIENCE:
 ${customICP}
 
-EVALUATION CRITERIA:
-1. Profile Match: Does the profile's headline, role, or industry indicate they fit the target audience?
-2. Content Relevance: Does the post content discuss topics that the target audience would talk about or find relevant?
-3. Topic Alignment: Are the themes, subjects, or issues in the post aligned with what your ICP would engage with?
-4. Professional Quality: Is this a real professional (not a bot, spam account, or fake profile)?
-5. Overall Relevance: Would this person and their content be valuable to the target audience?
+PROFILE:
+Name: ${profileData.name || 'Unknown'}
+Headline: ${profileData.headline || 'Not available'}
+${postPreview ? `Post: ${postPreview}` : ''}
 
-DECISION RULES:
-- SHOW if the profile OR post content aligns with the target audience
-- SHOW if the post discusses topics relevant to what the ICP would talk about
-- SHOW if there's reasonable alignment (don't be overly strict)
-- HIDE if both the profile and post content clearly don't match the target audience
-- HIDE if it's clearly spam, fake, or irrelevant
-- When uncertain, default to SHOW
+Question: Does this profile or their post content match the target audience above?
 
-Respond with ONLY "SHOW" or "HIDE" - nothing else.`;
+Instructions:
+- Compare the profile headline and post content to the target audience description
+- SHOW if the person fits the target audience OR if their post discusses topics relevant to the target audience
+- HIDE if the person clearly doesn't fit AND their post isn't relevant to the target audience
+- Be practical: if there's any reasonable connection, SHOW it
+
+Answer with exactly one word: SHOW or HIDE`;
 
         const response = await fetch(
             `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash-exp:generateContent?key=${apiKey}`,
@@ -260,9 +265,9 @@ Respond with ONLY "SHOW" or "HIDE" - nothing else.`;
                 body: JSON.stringify({
                     contents: [{ parts: [{ text: prompt }] }],
                     generationConfig: {
-                        temperature: 0.2,
-                        maxOutputTokens: 5,
-                        topP: 0.8
+                        temperature: 0.1,
+                        maxOutputTokens: 10,
+                        topP: 0.9
                     }
                 })
             }
@@ -275,10 +280,30 @@ Respond with ONLY "SHOW" or "HIDE" - nothing else.`;
         }
 
         const data = await response.json();
-        const text = data.candidates?.[0]?.content?.parts?.[0]?.text?.trim().toUpperCase() || 'SHOW';
+        const responseText = data.candidates?.[0]?.content?.parts?.[0]?.text?.trim().toUpperCase() || '';
         
-        // Parse response - look for SHOW or HIDE
-        const shouldShow = text.includes('SHOW') && !text.includes('HIDE');
+        // More robust parsing - check for SHOW or HIDE
+        let shouldShow = true; // Default to show
+        
+        if (responseText.includes('HIDE')) {
+            shouldShow = false;
+        } else if (responseText.includes('SHOW')) {
+            shouldShow = true;
+        } else if (responseText.length > 0) {
+            // If we got a response but it's not clear, check first word
+            const firstWord = responseText.split(/\s+/)[0];
+            shouldShow = firstWord === 'SHOW';
+        }
+        
+        // Debug logging (can be removed in production)
+        if (responseText && responseText !== 'SHOW' && responseText !== 'HIDE') {
+            console.log('[authr] ICP Analysis:', {
+                profile: profileData.name,
+                headline: profileData.headline.substring(0, 50),
+                response: responseText,
+                decision: shouldShow ? 'SHOW' : 'HIDE'
+            });
+        }
         
         return { shouldShow };
     } catch (error) {
