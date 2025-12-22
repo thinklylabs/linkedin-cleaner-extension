@@ -42,7 +42,10 @@ async function processPost(postElement) {
 
     postElement.dataset.profileFiltered = 'true';
 
-    const cacheKey = `${profileData.name}_${profileData.headline}`;
+    // Create cache key from profile + post content hash (first 100 chars)
+    const postHash = profileData.postText ? profileData.postText.substring(0, 100).replace(/\s+/g, ' ') : '';
+    const cacheKey = `${profileData.name}_${profileData.headline}_${postHash}`;
+    
     if (processedProfiles.has(cacheKey)) {
         const shouldShow = processedProfiles.get(cacheKey);
         if (!shouldShow) blurPost(postElement);
@@ -76,6 +79,14 @@ function extractProfileData(postElement) {
     const headlineEl = actor.querySelector('.update-components-actor__description span[aria-hidden="true"]');
 
     const postContainer = postElement.closest('.feed-shared-update-v2');
+    
+    // Extract post text content
+    const postTextEl = postContainer?.querySelector('.feed-shared-text-view__text-view span[aria-hidden="true"]') ||
+                       postContainer?.querySelector('.feed-shared-update-v2__description span[aria-hidden="true"]') ||
+                       postContainer?.querySelector('.update-components-text span[aria-hidden="true"]');
+    const postText = postTextEl?.textContent.trim() || '';
+
+    // Check for promoted/sponsored content
     const isPromoted =
         headlineEl?.textContent.toLowerCase().includes('promoted') ||
         headlineEl?.textContent.toLowerCase().includes('sponsored') ||
@@ -83,12 +94,25 @@ function extractProfileData(postElement) {
         postContainer?.querySelector('[data-ad-banner-container]') !== null ||
         postContainer?.querySelector('.feed-shared-actor__supplementary-actor-info')?.textContent.toLowerCase().includes('promoted') ||
         postContainer?.textContent.toLowerCase().includes('promoted') ||
+        postText.toLowerCase().includes('promoted') ||
+        postText.toLowerCase().includes('sponsored') ||
+        false;
+
+    // Check for job posting indicators
+    const isJobPosting = 
+        postContainer?.querySelector('.job-card-container') !== null ||
+        postContainer?.querySelector('[data-job-id]') !== null ||
+        postText.toLowerCase().includes('we are hiring') ||
+        postText.toLowerCase().includes('join our team') ||
+        headlineEl?.textContent.toLowerCase().includes('recruiter') ||
         false;
 
     return {
         name: nameEl?.textContent.trim() || '',
         headline: headlineEl?.textContent.trim() || '',
-        isPromoted: isPromoted
+        postText: postText.substring(0, 500), // Limit to 500 chars for API efficiency
+        isPromoted: isPromoted,
+        isJobPosting: isJobPosting
     };
 }
 
@@ -186,22 +210,47 @@ function unblurAllPosts() {
 
 async function analyzeWithGemini(profileData, apiKey, customICP) {
     try {
-        let prompt = `Analyze this LinkedIn profile:
-- Name: ${profileData.name}
-- Headline: ${profileData.headline}
-- Promoted/Sponsored: ${profileData.isPromoted}
-
-`;
-
-        if (customICP) {
-            prompt += `Target audience: ${customICP}
-
-Should this profile be shown based on the target audience? `;
-        } else {
-            prompt += `Is this a real professional worth engaging with (not spam/promotional)? `;
+        // Always hide promoted content and job postings
+        if (profileData.isPromoted || profileData.isJobPosting) {
+            return { shouldShow: false };
         }
 
-        prompt += `Reply ONLY with "SHOW" or "HIDE".`;
+        // If no ICP specified, show all non-promoted posts
+        if (!customICP) {
+            return { shouldShow: true };
+        }
+
+        // Well-defined ICP matching prompt with post content analysis
+        const postPreview = profileData.postText ? profileData.postText.substring(0, 300) : 'No post content available';
+        
+        const prompt = `Analyze this LinkedIn profile and post to determine if it matches the target audience.
+
+PROFILE DATA:
+- Name: ${profileData.name || 'Unknown'}
+- Professional Headline: ${profileData.headline || 'Not available'}
+
+POST CONTENT (first few lines):
+${postPreview}
+
+TARGET AUDIENCE (ICP):
+${customICP}
+
+EVALUATION CRITERIA:
+1. Profile Match: Does the profile's headline, role, or industry indicate they fit the target audience?
+2. Content Relevance: Does the post content discuss topics that the target audience would talk about or find relevant?
+3. Topic Alignment: Are the themes, subjects, or issues in the post aligned with what your ICP would engage with?
+4. Professional Quality: Is this a real professional (not a bot, spam account, or fake profile)?
+5. Overall Relevance: Would this person and their content be valuable to the target audience?
+
+DECISION RULES:
+- SHOW if the profile OR post content aligns with the target audience
+- SHOW if the post discusses topics relevant to what the ICP would talk about
+- SHOW if there's reasonable alignment (don't be overly strict)
+- HIDE if both the profile and post content clearly don't match the target audience
+- HIDE if it's clearly spam, fake, or irrelevant
+- When uncertain, default to SHOW
+
+Respond with ONLY "SHOW" or "HIDE" - nothing else.`;
 
         const response = await fetch(
             `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash-exp:generateContent?key=${apiKey}`,
@@ -211,24 +260,30 @@ Should this profile be shown based on the target audience? `;
                 body: JSON.stringify({
                     contents: [{ parts: [{ text: prompt }] }],
                     generationConfig: {
-                        temperature: 0.3,
-                        maxOutputTokens: 10
+                        temperature: 0.2,
+                        maxOutputTokens: 5,
+                        topP: 0.8
                     }
                 })
             }
         );
 
         if (!response.ok) {
-            return { shouldShow: true };
+            const errorText = await response.text();
+            console.error('Gemini API error:', response.status, errorText);
+            return { shouldShow: true }; // Default to show on error
         }
 
         const data = await response.json();
         const text = data.candidates?.[0]?.content?.parts?.[0]?.text?.trim().toUpperCase() || 'SHOW';
         
-        return { shouldShow: text.includes('SHOW') };
+        // Parse response - look for SHOW or HIDE
+        const shouldShow = text.includes('SHOW') && !text.includes('HIDE');
+        
+        return { shouldShow };
     } catch (error) {
         console.error('Gemini analysis failed:', error);
-        return { shouldShow: true };
+        return { shouldShow: true }; // Default to show on error
     }
 }
 

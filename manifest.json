@@ -1,6 +1,6 @@
 {
   "manifest_version": 3,
-  "name": "LinkedIn Feed Cleaner",
+  "name": "authr",
   "version": "1.0.0",
   "description": "Clean your LinkedIn feed with AI-powered filtering",
   "permissions": [
@@ -23,7 +23,7 @@
   ],
   "action": {
     "default_popup": "pages/popup.html",
-    "default_title": "LinkedIn Feed Cleaner"
+    "default_title": "authr"
   },
   "background": {
     "service_worker": "scripts/background.js"
