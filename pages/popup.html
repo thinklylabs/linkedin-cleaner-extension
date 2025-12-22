@@ -1,267 +1,3 @@
-<!-- <!DOCTYPE html>
-<html>
-
-<head>
-  <meta charset="UTF-8">
-  <title>Authr - LinkedIn Profile Filter</title>
-  <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Old+Standard+TT:wght@400;700&display=swap" rel="stylesheet">
-  <style>
-    * {
-      margin: 0;
-      padding: 0;
-      box-sizing: border-box;
-    }
-
-    body {
-      width: 360px;
-      min-height: 400px;
-      padding: 24px;
-      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-      background: #FCF9F5;
-      color: #0D1717;
-    }
-
-    .hidden {
-      display: none;
-    }
-
-    .logo {
-      text-align: center;
-      margin-bottom: 24px;
-    }
-
-    h3 {
-      font-family: 'Old Standard TT', serif;
-      font-size: 24px;
-      font-weight: 400;
-      line-height: 1.236;
-      color: #0D1717;
-      margin: 0 0 16px 0;
-      text-align: center;
-    }
-
-    p {
-      font-size: 12px;
-      line-height: 1.3;
-      color: #0D1717;
-      margin: 0 0 20px 0;
-      text-align: center;
-    }
-
-    .btn {
-      background: #1DC6A1;
-      color: white;
-      padding: 8px 16px;
-      border: none;
-      border-radius: 5px;
-      cursor: pointer;
-      width: 100%;
-      font-size: 12px;
-      font-weight: 500;
-      line-height: 1.3;
-      transition: opacity 0.2s;
-      margin-top: 8px;
-    }
-
-    .btn:hover {
-      opacity: 0.9;
-    }
-
-    .btn-logout {
-      background: #F4F4F4;
-      color: #0D1717;
-      border: 0.5px solid #0D1717;
-    }
-
-    .status-badge {
-      display: inline-flex;
-      align-items: center;
-      background: #1DC6A1;
-      color: white;
-      padding: 6px 12px;
-      border-radius: 16px;
-      font-size: 11px;
-      font-weight: 600;
-      margin: 0 auto 16px auto;
-      width: fit-content;
-    }
-
-    .status-indicator {
-      display: inline-block;
-      width: 6px;
-      height: 6px;
-      border-radius: 50%;
-      background: white;
-      margin-right: 6px;
-      animation: pulse 2s ease-in-out infinite;
-    }
-
-    @keyframes pulse {
-
-      0%,
-      100% {
-        opacity: 1;
-      }
-
-      50% {
-        opacity: 0.5;
-      }
-    }
-
-    .info-box {
-      background: white;
-      padding: 16px;
-      border-radius: 5px;
-      font-size: 12px;
-      line-height: 1.5;
-      color: #0D1717;
-      margin-top: 20px;
-      border: 0.5px solid #0D1717;
-    }
-
-    .info-box strong {
-      display: block;
-      margin-bottom: 8px;
-      font-size: 12px;
-    }
-
-    .divider {
-      height: 1px;
-      background: #0D1717;
-      margin: 20px 0;
-      opacity: 0.2;
-    }
-
-    .emoji {
-      font-size: 32px;
-      margin-bottom: 16px;
-      text-align: center;
-    }
-
-    .container {
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-    }
-
-    .toggle-container {
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      width: 100%;
-      padding: 12px 16px;
-      background: white;
-      border-radius: 5px;
-      border: 0.5px solid #0D1717;
-      margin-top: 20px;
-    }
-
-    .toggle-label {
-      font-size: 12px;
-      font-weight: 500;
-      color: #0D1717;
-    }
-
-    .toggle-switch {
-      position: relative;
-      width: 44px;
-      height: 24px;
-      background: #F4F4F4;
-      border-radius: 12px;
-      cursor: pointer;
-      transition: background 0.3s;
-      border: 0.5px solid #0D1717;
-    }
-
-    .toggle-switch.active {
-      background: #1DC6A1;
-      border-color: #1DC6A1;
-    }
-
-    .toggle-slider {
-      position: absolute;
-      top: 2px;
-      left: 2px;
-      width: 18px;
-      height: 18px;
-      background: white;
-      border-radius: 50%;
-      transition: transform 0.3s;
-      box-shadow: 0 1px 3px rgba(0, 0, 0, 0.2);
-    }
-
-    .toggle-switch.active .toggle-slider {
-      transform: translateX(20px);
-    }
-  </style>
-</head>
-
-<body>
-  <div id="logged-out">
-    <div class="container">
-      <div class="emoji">🔒</div>
-      <h3>Sign in Required</h3>
-      <p>Please sign in with your Authr account to start filtering your LinkedIn feed</p>
-      <button class="btn" id="login-btn">Sign in with Authr</button>
-
-      <div class="info-box">
-        <strong>What you'll get:</strong>
-        ✨ Clean, focused LinkedIn feed<br>
-        🎯 Only see tech professionals<br>
-        ⚡ Automatic profile filtering
-      </div>
-    </div>
-  </div>
-
-  <div id="logged-in" class="hidden">
-    <div class="container">
-      <div class="status-badge">
-        <span class="status-indicator"></span>
-        Filter Active
-      </div>
-
-      <h3>Filter Active</h3>
-      <p>Your LinkedIn feed is being filtered based on profile quality</p>
-
-      <div class="info-box">
-        <strong>How it works:</strong>
-        Posts from non-technical profiles are automatically blurred. Click "View" on any post to reveal it.
-      </div>
-
-      <div class="toggle-container">
-        <span class="toggle-label">Enable Filtering</span>
-        <div class="toggle-switch active" id="filter-toggle">
-          <div class="toggle-slider"></div>
-        </div>
-      </div>
-
-      <div class="divider"></div>
-
-      <button class="btn btn-logout" id="logout-btn">
-        Sign Out
-      </button>
-    </div>
-  </div>
-
-  <script>
-    // Debug: Log that HTML is loaded
-    console.log('Popup HTML loaded');
-
-    // Catch any errors
-    window.onerror = function (msg, url, lineNo, columnNo, error) {
-      console.error('Error in popup:', msg, 'at', url, lineNo, columnNo);
-      return false;
-    };
-  </script>
-  <script src="scripts/config.js"></script>
-  <script src="scripts/popup.js"></script>
-</body>
-
-</html> -->
-
-
 <!DOCTYPE html>
 <html>
 
@@ -319,7 +55,7 @@
       color: white;
       padding: 8px 16px;
       border: none;
-      border-radius: 5px;
+      border-radius: 10px;
       cursor: pointer;
       width: 100%;
       font-size: 12px;
@@ -337,6 +73,14 @@
       background: #F4F4F4;
       color: #0D1717;
       border: 0.5px solid #0D1717;
+      transition: opacity 0.2s;
+      font-weight: bold;
+    }
+
+    .btn-logout:hover {
+      background-color: rgba(197, 21, 21, 0.785);
+      /* opacity: 0.6; */
+      color: white;
     }
 
     .status-badge {
@@ -354,8 +98,8 @@
 
     .status-indicator {
       display: inline-block;
-      width: 6px;
-      height: 6px;
+      width: 10px;
+      height: 10px;
       border-radius: 50%;
       background: white;
       margin-right: 6px;
@@ -377,13 +121,21 @@
     .info-box {
       background: white;
       padding: 16px;
+      text-align: left;
       border-radius: 5px;
       font-size: 12px;
       line-height: 1.5;
       color: #0D1717;
       margin-top: 20px;
-      border: 0.5px solid #0D1717;
+      border: 0.5px solid black;
     }
+
+    .info-box ul {
+      text-align: left;
+      margin: 0;
+      padding-left: 20px;
+    }
+
 
     .info-box strong {
       display: block;
@@ -409,22 +161,84 @@
       flex-direction: column;
       align-items: center;
     }
+
+    .emoji svg {
+      width: 32px;
+      height: 32px;
+      stroke: #0D1717;
+    }
+
+    .info-box svg {
+      width: 14px;
+      height: 14px;
+      vertical-align: middle;
+      margin-right: 6px;
+      stroke: #1DC6A1;
+    }
+
+    .content-row {
+      display: flex;
+      align-items: center;
+      gap: 16px;
+    }
+
+    .left img {
+      max-width: 120px;
+    }
+
+    .right {
+      flex: 1;
+    }
+
+    #use-custom-key-link:hover {
+      opacity: 1 !important;
+    }
   </style>
 </head>
 
 <body>
   <div id="logged-out" class="hidden">
     <div class="container">
-      <div class="emoji">🔒</div>
+      <div class="emoji">
+        <svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 24 24" fill="none"
+          stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <rect width="18" height="11" x="3" y="11" rx="2" ry="2" />
+          <path d="M7 11V7a5 5 0 0 1 10 0v4" />
+        </svg>
+      </div>
       <h3>Sign in Required</h3>
       <p>Please sign in with your Authr account to start filtering your LinkedIn feed</p>
       <button class="btn" id="login-btn">Sign in with Authr</button>
 
+      <p style="margin-top: 16px; font-size: 11px;">
+        <a href="#" id="use-custom-key-link"
+          style="color: #0D1717; text-decoration: underline; opacity: 0.7; transition: opacity 0.2s;">
+          Continue without authr account
+        </a>
+      </p>
+
       <div class="info-box">
         <strong>What you'll get:</strong>
-        ✨ Clean, focused LinkedIn feed<br>
-        🎯 Only see tech professionals<br>
-        ⚡ Automatic profile filtering
+        <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none"
+          stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <path
+            d="m12 3-1.912 5.813a2 2 0 0 1-1.275 1.275L3 12l5.813 1.912a2 2 0 0 1 1.275 1.275L12 21l1.912-5.813a2 2 0 0 1 1.275-1.275L21 12l-5.813-1.912a2 2 0 0 1-1.275-1.275L12 3Z" />
+          <path d="M5 3v4" />
+          <path d="M19 17v4" />
+          <path d="M3 5h4" />
+          <path d="M17 19h4" />
+        </svg>Clean, focused LinkedIn feed<br>
+        <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none"
+          stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <circle cx="12" cy="12" r="10" />
+          <circle cx="12" cy="12" r="6" />
+          <circle cx="12" cy="12" r="2" />
+        </svg>Only see relevant professionals<br>
+        <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none"
+          stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <path
+            d="M4 14a1 1 0 0 1-.78-1.63l9.9-10.2a.5.5 0 0 1 .86.46l-1.92 6.02A1 1 0 0 0 13 10h7a1 1 0 0 1 .78 1.63l-9.9 10.2a.5.5 0 0 1-.86-.46l1.92-6.02A1 1 0 0 0 11 14z" />
+        </svg>Automatic ICP filtering
       </div>
     </div>
   </div>
@@ -437,20 +251,86 @@
       </div>
 
       <h3>Filter Active</h3>
-      <p>Your LinkedIn feed is being filtered based on profile quality</p>
 
-      <div class="info-box">
+      <div class="content-row">
+        <div class="left">
+          <img src="../images/north-peeping.png" alt="">
+        </div>
+        <div class="info-box">
+          <ul>
+            <li><b>authr</b> is filtering your LinkedIn feed</li>
+            <li>Skipping ads and irrelevant jargon :)</li>
+            <li>Only high-signal, ICP's posts stay visible</li>
+          </ul>
+        </div>
+      </div>
+
+      <!-- <div class="info-box">
         <strong>How it works:</strong>
         Posts from non-technical profiles are automatically blurred. Click "View" on any post to reveal it.
-      </div>
+      </div> -->
 
       <div class="divider"></div>
 
-      <button class="btn btn-logout" id="logout-btn">
-        Sign Out
-      </button>
+      <button class="btn btn-logout" id="logout-btn">Sign Out</button>
     </div>
   </div>
+
+  <!-- API Key Configuration Screen -->
+  <div id="api-key-config" class="hidden">
+    <div class="container">
+      <div class="emoji">
+        <svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 24 24" fill="none"
+          stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <rect width="14" height="4" x="8" y="2" rx="1" ry="1" />
+          <path d="M16 8v11a2 2 0 0 1-2 2h-4a2 2 0 0 1-2-2V8" />
+          <path d="M9 15h6" />
+        </svg>
+      </div>
+      <h3>Configure Gemini API</h3>
+      <p>Use your own Gemini API key for filtering</p>
+
+      <div style="margin-top: 20px; text-align: left;">
+        <label for="gemini-key-input"
+          style="display: block; font-size: 11px; font-weight: 600; margin-bottom: 6px; color: #0D1717;">
+          Gemini API Key
+        </label>
+        <div style="position: relative;">
+          <input type="password" id="gemini-key-input" placeholder="Enter your Gemini API key"
+            style="width: 100%; padding: 10px 36px 10px 12px; border: 1px solid #0D1717; border-radius: 8px; font-size: 12px; font-family: monospace;" />
+          <button id="toggle-key-visibility" type="button"
+            style="position: absolute; right: 8px; top: 50%; transform: translateY(-50%); background: none; border: none; cursor: pointer; padding: 4px;">
+            <svg id="eye-icon" xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none"
+              stroke="#0D1717" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7Z" />
+              <circle cx="12" cy="12" r="3" />
+            </svg>
+          </button>
+        </div>
+        <p style="font-size: 10px; margin-top: 4px; opacity: 0.7;">Get your API key from <a
+            href="https://aistudio.google.com/app/apikey" target="_blank" style="color: #1DC6A1;">Google AI Studio</a>
+        </p>
+      </div>
+
+      <div style="margin-top: 16px; text-align: left;">
+        <label for="custom-icp-input"
+          style="display: block; font-size: 11px; font-weight: 600; margin-bottom: 6px; color: #0D1717;">
+          Your ICP Description (Optional)
+        </label>
+        <textarea id="custom-icp-input" placeholder="e.g., B2B SaaS founders in the US with 10-50 employees" rows="3"
+          style="width: 100%; padding: 10px 12px; border: 1px solid #0D1717; border-radius: 8px; font-size: 12px; resize: vertical; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;"></textarea>
+        <p style="font-size: 10px; margin-top: 4px; opacity: 0.7;">Describe your ideal customer profile for better
+          filtering</p>
+      </div>
+
+      <button class="btn" id="save-api-key-btn" style="margin-top: 20px;">Save & Start Filtering</button>
+      <button class="btn" id="back-to-signin-btn"
+        style="background: transparent; color: #0D1717; border: 1px solid #0D1717;">Back to Sign In</button>
+
+      <div id="api-key-status" style="margin-top: 12px; font-size: 11px; text-align: center; display: none;"></div>
+    </div>
+  </div>
+
 
   <script src="../scripts/config.js"></script>
   <script src="../scripts/popup.js"></script>

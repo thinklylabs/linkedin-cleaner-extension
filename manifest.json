@@ -9,7 +9,8 @@
   ],
   "host_permissions": [
     "https://www.linkedin.com/feed/*",
-    "http://localhost:3000/*"
+    "http://localhost:3000/*",
+    "https://generativelanguage.googleapis.com/*"
   ],
   "externally_connectable": {
     "matches": [

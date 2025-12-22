@@ -1,9 +1,13 @@
 const API_BASE = CONFIG.API_BASE_URL;
 const processedProfiles = new Map();
 
+console.log('🔧 [Content] Script loaded, API_BASE:', API_BASE);
+
 // Listen for toggle messages from popup
 chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
+    console.log('📨 [Content] Message received:', request);
     if (request.action === 'TOGGLE_FILTER') {
+        console.log('🎚️ [Content] Filter toggle:', request.enabled ? 'ENABLED' : 'DISABLED');
         if (request.enabled) {
             // Re-process all posts when filter is enabled
             processExistingPosts();
@@ -11,27 +15,79 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
             // Un-blur all posts when filter is disabled
             unblurAllPosts();
         }
+    } else if (request.action === 'AUTH_COMPLETE') {
+        console.log('🎉 [Content] Authentication completed! Starting filtering automatically...');
+        // Re-initialize to start filtering with new tokens
+        init();
     }
 });
 
 async function init() {
-    const { accessToken, filterEnabled } = await chrome.storage.local.get(['accessToken', 'filterEnabled']);
+    console.log('🚀 [Content] Initializing...');
+    const { accessToken, filterEnabled, customGeminiKey } = await chrome.storage.local.get([
+        'accessToken',
+        'filterEnabled',
+        'customGeminiKey'
+    ]);
 
-    if (!accessToken) {
-        console.warn('Extension not authenticated');
+    console.log('📊 [Content] Storage state:', {
+        hasAccessToken: !!accessToken,
+        accessTokenLength: accessToken?.length || 0,
+        filterEnabled: filterEnabled,
+        hasCustomGeminiKey: !!customGeminiKey
+    });
+
+    // Check if we have either authentication method
+    if (!accessToken && !customGeminiKey) {
+        console.warn('⚠️ [Content] Extension not authenticated - no accessToken or custom Gemini key');
         return;
+    }
+
+    if (customGeminiKey) {
+        console.log('✅ [Content] Custom Gemini API key found');
+    } else {
+        console.log('✅ [Content] AccessToken found');
     }
 
     // Check if filtering is enabled (default to true if not set)
     if (filterEnabled === false) {
-        console.log('LinkedIn Profile Filter: Disabled');
+        console.log('🎚️ [Content] LinkedIn Profile Filter: Disabled');
         return;
     }
 
-    console.log('LinkedIn Profile Filter: Active');
+    console.log('✅ [Content] LinkedIn Profile Filter: Active');
+    if (accessToken) {
+        console.log('ℹ️ [Content] Token will be validated when making API calls');
+    }
     processExistingPosts();
     observeNewPosts();
 }
+
+async function verifyToken(token) {
+    try {
+        const response = await fetch(`${API_BASE}/api/extension/auth/verify`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ sessionToken: token })
+        });
+
+        console.log('📡 [Content] Token verification response:', response.status);
+
+        if (!response.ok) {
+            console.error('❌ [Content] Token verification failed:', response.status);
+            return false;
+        }
+
+        const data = await response.json();
+        console.log('📊 [Content] Verification result:', data);
+
+        return data.authenticated === true;
+    } catch (error) {
+        console.error('❌ [Content] Token verification error:', error);
+        return false;
+    }
+}
+
 async function processPost(postElement) {
     // Skip if already processed
     if (postElement.dataset.profileFiltered) return;
@@ -39,41 +95,87 @@ async function processPost(postElement) {
     const profileData = extractProfileData(postElement);
     if (!profileData) return;
 
+    console.log('🔍 [Content] Processing post:', {
+        name: profileData.name,
+        headline: profileData.headline,
+        isPromoted: profileData.isPromoted
+    });
+
     // Mark as processed immediately to prevent re-processing
     postElement.dataset.profileFiltered = 'true';
 
     const cacheKey = `${profileData.name}_${profileData.headline}`;
     if (processedProfiles.has(cacheKey)) {
-        if (!processedProfiles.get(cacheKey)) blurPost(postElement);
+        const shouldShow = processedProfiles.get(cacheKey);
+        console.log('📦 [Content] Using cached result:', shouldShow ? 'SHOW' : 'HIDE');
+        if (!shouldShow) blurPost(postElement);
         return;
     }
 
-    const { accessToken } = await chrome.storage.local.get('accessToken');
+    const { customGeminiKey, customICP, accessToken } = await chrome.storage.local.get([
+        'customGeminiKey',
+        'customICP',
+        'accessToken'
+    ]);
+
+    console.log('🔑 [Content] Auth state:', {
+        hasCustomKey: !!customGeminiKey,
+        hasCustomICP: !!customICP,
+        hasAccessToken: !!accessToken
+    });
 
     try {
-        const response = await fetch(`${API_BASE}/api/extension/filtering`, {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-                'Authorization': `Bearer ${accessToken}`
-            },
-            body: JSON.stringify({ profileData })
-        });
+        let result;
 
-        if (!response.ok) {
-            console.error('API error:', response.status);
+        // Use custom Gemini API key if available
+        if (customGeminiKey) {
+            console.log('🤖 [Content] Using custom Gemini API key for filtering');
+            result = await analyzeWithCustomKey(profileData, customGeminiKey, customICP);
+        }
+        // Otherwise use server API
+        else if (accessToken) {
+            console.log('🌐 [Content] Using server API for filtering');
+            const response = await fetch(`${API_BASE}/api/extension/filtering`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${accessToken}`
+                },
+                body: JSON.stringify({ profileData })
+            });
+
+            console.log('📡 [Content] API response:', response.status, response.statusText);
+
+            if (response.status === 401) {
+                console.error('❌ [Content] Token is invalid/expired (401), clearing storage');
+                await chrome.storage.local.clear();
+                console.error('🔄 [Content] Please sign in again via the extension popup');
+                return;
+            }
+
+            if (!response.ok) {
+                console.error('❌ [Content] API error:', response.status);
+                return;
+            }
+
+            result = await response.json();
+        } else {
+            console.warn('⚠️ [Content] No authentication method available');
             return;
         }
 
-        const result = await response.json();
+        console.log('📊 [Content] Filter result:', result);
+
         processedProfiles.set(cacheKey, result.shouldShow);
 
         if (!result.shouldShow) {
-            console.log('Blurring post from:', profileData.name);
+            console.log('🚫 [Content] Blurring post from:', profileData.name);
             blurPost(postElement);
+        } else {
+            console.log('✅ [Content] Showing post from:', profileData.name);
         }
     } catch (error) {
-        console.error('Profile analysis failed:', error);
+        console.error('❌ [Content] Profile analysis failed:', error);
     }
 }
 
@@ -110,6 +212,8 @@ function blurPost(postElement) {
     if (parent.dataset.blurred === 'true') return;
     parent.dataset.blurred = 'true';
 
+    console.log('🌫️ [Content] Applying blur effect');
+
     const wrapper = document.createElement('div');
     while (parent.firstChild) wrapper.appendChild(parent.firstChild);
     wrapper.style.filter = 'blur(10px)';
@@ -138,6 +242,7 @@ function blurPost(postElement) {
     btn.onmouseover = () => btn.style.background = '#004182';
     btn.onmouseout = () => btn.style.background = '#0a66c2';
     btn.onclick = () => {
+        console.log('👁️ [Content] User revealed blurred post');
         wrapper.style.filter = '';
         btn.remove();
         // Mark as revealed so it won't be re-blurred
@@ -151,16 +256,21 @@ function blurPost(postElement) {
 
 function processExistingPosts() {
     const posts = document.querySelectorAll('.feed-shared-update-v2__control-menu-container');
+    console.log('🔄 [Content] Processing existing posts:', posts.length);
     posts.forEach(processPost);
 }
 
 function observeNewPosts() {
+    console.log('👀 [Content] Setting up mutation observer for new posts');
     const observer = new MutationObserver(mutations => {
         mutations.forEach(m => {
             m.addedNodes.forEach(node => {
                 if (node.nodeType === 1) {
-                    node.querySelectorAll?.('.feed-shared-update-v2__control-menu-container')
-                        .forEach(processPost);
+                    const newPosts = node.querySelectorAll?.('.feed-shared-update-v2__control-menu-container');
+                    if (newPosts && newPosts.length > 0) {
+                        console.log('➕ [Content] New posts detected:', newPosts.length);
+                        newPosts.forEach(processPost);
+                    }
                 }
             });
         });
@@ -170,7 +280,9 @@ function observeNewPosts() {
 }
 
 function unblurAllPosts() {
+    console.log('🔓 [Content] Unblurring all posts');
     const posts = document.querySelectorAll('.feed-shared-update-v2__control-menu-container[data-blurred="true"]');
+    console.log('🔓 [Content] Posts to unblur:', posts.length);
     posts.forEach(parent => {
         // Remove blur effect and button
         const wrapper = parent.querySelector('div[style*="filter"]');
@@ -189,10 +301,89 @@ function unblurAllPosts() {
     });
 }
 
-// Initialize when DOM is ready
-if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', init);
-} else {
-    init();
+// Analyze profile using custom Gemini API key
+async function analyzeWithCustomKey(profileData, apiKey, customICP) {
+    try {
+        // Build the prompt
+        let prompt = `You are analyzing LinkedIn profiles to determine if they match the target audience criteria.
+
+Profile Information:
+- Name: ${profileData.name}
+- Headline: ${profileData.headline}
+- Is Promoted/Sponsored: ${profileData.isPromoted}
+
+`;
+
+        if (customICP) {
+            prompt += `Target Audience (ICP):
+${customICP}
+
+Based on the profile information and the target audience description, determine if this profile is relevant and should be shown.
+`;
+        } else {
+            prompt += `Determine if this profile represents a professional, high-value individual worth engaging with. Consider:
+- Is it a real person (not a company or promotional account)?
+- Does the headline indicate expertise or a meaningful professional role?
+- Is it NOT promotional or sponsored content?
+`;
+        }
+
+        prompt += `
+IMPORTANT: Respond with ONLY "SHOW" or "HIDE" - nothing else.
+- SHOW if the profile matches the criteria
+- HIDE if it doesn't match or is promotional/spam`;
+
+        const response = await fetch(
+            `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash-exp:generateContent?key=${apiKey}`,
+            {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({
+                    contents: [{
+                        parts: [{ text: prompt }]
+                    }],
+                    generationConfig: {
+                        temperature: 0.3,
+                        maxOutputTokens: 10
+                    }
+                })
+            }
+        );
+
+        console.log('📡 [Content] Gemini API response:', response.status);
+
+        if (!response.ok) {
+            console.error('❌ [Content] Gemini API error:', response.status);
+            const errorData = await response.json();
+            console.error('❌ [Content] Gemini API error details:', errorData);
+
+            // If quota exceeded or API error, fall back to showing the post
+            return { shouldShow: true };
+        }
+
+        const data = await response.json();
+        console.log('📊 [Content] Gemini API result:', data);
+
+        const text = data.candidates?.[0]?.content?.parts?.[0]?.text?.trim().toUpperCase() || 'SHOW';
+        const shouldShow = text.includes('SHOW');
+
+        console.log('🤖 [Content] Gemini decision:', text, '-> shouldShow:', shouldShow);
+
+        return { shouldShow };
+    } catch (error) {
+        console.error('❌ [Content] Custom key analysis failed:', error);
+        // On error, default to showing the post
+        return { shouldShow: true };
+    }
 }
 
+// Initialize when DOM is ready
+if (document.readyState === 'loading') {
+    console.log('⏳ [Content] Waiting for DOMContentLoaded...');
+    document.addEventListener('DOMContentLoaded', init);
+} else {
+    console.log('✅ [Content] DOM already loaded, initializing immediately');
+    init();
+}

@@ -5,13 +5,28 @@ const API_BASE = CONFIG.API_BASE_URL;
 // Listen for auth messages from web app
 chrome.runtime.onMessageExternal.addListener(
     (request, sender, sendResponse) => {
+
+
         if (request.action === 'AUTH_SUCCESS') {
             chrome.storage.local.set({
                 accessToken: request.accessToken,
                 refreshToken: request.refreshToken,
                 expiresAt: request.expiresAt
             }, () => {
-                console.log('Authentication tokens stored');
+
+
+                // Notify all LinkedIn tabs to start filtering
+                chrome.tabs.query({ url: 'https://www.linkedin.com/feed/*' }, (tabs) => {
+                    tabs.forEach(tab => {
+                        chrome.tabs.sendMessage(tab.id, {
+                            action: 'AUTH_COMPLETE',
+                            message: 'Authentication successful, you can now start filtering'
+                        }).catch(err => {
+                            console.error("Error: ", err)
+                        });
+                    });
+                });
+
                 sendResponse({ success: true });
             });
             return true;
@@ -33,13 +48,18 @@ async function checkAndRefreshToken() {
         'accessToken', 'refreshToken', 'expiresAt'
     ]);
 
-    if (!refreshToken || !expiresAt) return;
+
+    if (!refreshToken || !expiresAt) {
+        return;
+    }
 
     // Refresh if expiring in next 10 minutes
     const expiresIn = expiresAt - Math.floor(Date.now() / 1000);
-    if (expiresIn > 600) return; // Still valid for 10+ min
 
-    console.log('Token expiring soon, refreshing...');
+    if (expiresIn > 600) {
+        return; // Still valid for 10+ min
+    }
+
 
     try {
         const response = await fetch(`${API_BASE}/api/extension/auth/refresh`, {
@@ -47,6 +67,7 @@ async function checkAndRefreshToken() {
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ refreshToken })
         });
+
 
         const data = await response.json();
 
@@ -56,11 +77,10 @@ async function checkAndRefreshToken() {
                 refreshToken: data.refreshToken,
                 expiresAt: data.expiresAt
             });
-            console.log('Token refreshed successfully');
         } else {
-            console.error('Token refresh failed:', data.error);
+            console.error('❌ [Background] Token refresh failed:', data.error);
         }
     } catch (error) {
-        console.error('Token refresh error:', error);
+        console.error('❌ [Background] Token refresh error:', error);
     }
 }
