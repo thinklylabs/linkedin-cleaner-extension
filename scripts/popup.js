@@ -160,8 +160,12 @@ function showLoggedOut() {
     const loggedOut = document.getElementById('logged-out');
     const loggedIn = document.getElementById('logged-in');
     if (loggedOut && loggedIn) {
-        loggedOut.classList.remove('hidden');
         loggedIn.classList.add('hidden');
+        loggedOut.classList.remove('hidden');
+        // Add fade-in animation
+        setTimeout(() => {
+            loggedOut.classList.add('fade-in');
+        }, 10);
     }
 }
 
@@ -169,19 +173,28 @@ function showLoggedIn() {
     const loggedIn = document.getElementById('logged-in');
     const loggedOut = document.getElementById('logged-out');
     if (loggedIn && loggedOut) {
-        loggedIn.classList.remove('hidden');
         loggedOut.classList.add('hidden');
+        loggedIn.classList.remove('hidden');
+        // Add fade-in animation
+        setTimeout(() => {
+            loggedIn.classList.add('fade-in');
+        }, 10);
     }
 }
 
 function updateToggleUI(isEnabled) {
-    const toggle = document.getElementById('filter-toggle');
-    if (toggle) {
-        if (isEnabled) {
-            toggle.classList.add('active');
-        } else {
-            toggle.classList.remove('active');
+    const toggleContainer = document.getElementById('filter-toggle');
+    if (toggleContainer) {
+        const toggleSwitch = toggleContainer.querySelector('.toggle-switch');
+        if (toggleSwitch) {
+            if (isEnabled) {
+                toggleSwitch.classList.add('active');
+            } else {
+                toggleSwitch.classList.remove('active');
+            }
         }
+        // Update ARIA attributes
+        toggleContainer.setAttribute('aria-checked', isEnabled.toString());
     }
 }
 
@@ -200,20 +213,39 @@ document.addEventListener('DOMContentLoaded', () => {
     });
 
     // Toggle button - enables/disables filtering
-    document.getElementById('filter-toggle')?.addEventListener('click', async () => {
-        const { filterEnabled } = await chrome.storage.local.get('filterEnabled');
-        const newState = filterEnabled === false ? true : false;
+    const toggleContainer = document.getElementById('filter-toggle');
+    if (toggleContainer) {
+        const handleToggle = async (e) => {
+            // Prevent event bubbling
+            if (e) e.stopPropagation();
+            
+            const { filterEnabled } = await chrome.storage.local.get('filterEnabled');
+            const newState = filterEnabled === false ? true : false;
 
-        await chrome.storage.local.set({ filterEnabled: newState });
-        updateToggleUI(newState);
+            await chrome.storage.local.set({ filterEnabled: newState });
+            updateToggleUI(newState);
+            
+            // Update ARIA attributes
+            toggleContainer.setAttribute('aria-checked', newState.toString());
 
-        // Notify content script to refresh filtering
-        chrome.tabs.query({ url: 'https://www.linkedin.com/feed/*' }, (tabs) => {
-            tabs.forEach(tab => {
-                chrome.tabs.sendMessage(tab.id, { action: 'TOGGLE_FILTER', enabled: newState });
+            // Notify content script to refresh filtering
+            chrome.tabs.query({ url: 'https://www.linkedin.com/feed/*' }, (tabs) => {
+                tabs.forEach(tab => {
+                    chrome.tabs.sendMessage(tab.id, { action: 'TOGGLE_FILTER', enabled: newState });
+                });
             });
+        };
+
+        toggleContainer.addEventListener('click', handleToggle);
+        
+        // Support keyboard navigation (Enter and Space)
+        toggleContainer.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter' || e.key === ' ') {
+                e.preventDefault();
+                handleToggle(e);
+            }
         });
-    });
+    }
 
     // Run init after event listeners are set up
     init();
