@@ -4,12 +4,21 @@
   "version": "1.0.0",
   "description": "Clean your LinkedIn feed with AI-powered filtering",
   "permissions": [
-    "storage"
+    "storage",
+    "alarms"
   ],
   "host_permissions": [
     "https://www.linkedin.com/feed/*",
-    "https://generativelanguage.googleapis.com/*"
+    "https://generativelanguage.googleapis.com/*",
+    "http://localhost:3000/*",
+    "https://authr-ai.com/*"
   ],
+  "externally_connectable": {
+    "matches": [
+      "http://localhost:3000/*",
+      "https://authr-ai.com/*"
+    ]
+  },
   "content_scripts": [
     {
       "js": [

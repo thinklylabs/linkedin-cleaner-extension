@@ -1,28 +1,36 @@
 // LinkedIn Feed Cleaner - Content Script
 // Filters LinkedIn feed posts using Gemini AI
 
+const API_BASE = CONFIG.API_BASE_URL;
 const processedProfiles = new Map();
+let hiddenPostsCount = 0;
+let counterBadge = null;
 
 // Listen for messages from popup
-chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
+chrome.runtime.onMessage.addListener((request) => {
     if (request.action === 'TOGGLE_FILTER') {
         if (request.enabled) {
             processExistingPosts();
         } else {
             unblurAllPosts();
         }
-    } else if (request.action === 'AUTH_COMPLETE') {
+    } else if (request.action === 'AUTH_COMPLETE' || request.action === 'SETTINGS_UPDATED') {
+        // Reset and reinitialize when settings change
+        hiddenPostsCount = 0;
+        updateCounterBadge();
         init();
     }
 });
 
 async function init() {
-    const { filterEnabled, customGeminiKey } = await chrome.storage.local.get([
+    const { filterEnabled, customGeminiKey, accessToken } = await chrome.storage.local.get([
         'filterEnabled',
-        'customGeminiKey'
+        'customGeminiKey',
+        'accessToken'
     ]);
 
-    if (!customGeminiKey) {
+    // Must have either custom key or access token
+    if (!customGeminiKey && !accessToken) {
         return;
     }
 
@@ -30,6 +38,7 @@ async function init() {
         return;
     }
 
+    createCounterBadge();
     processExistingPosts();
     observeNewPosts();
 }
@@ -46,28 +55,73 @@ async function processPost(postElement) {
     const postHash = profileData.postText ? profileData.postText.substring(0, 100).replace(/\s+/g, ' ') : '';
     const cacheKey = `${profileData.name}_${profileData.headline}_${postHash}`;
     
-    if (processedProfiles.has(cacheKey)) {
-        const shouldShow = processedProfiles.get(cacheKey);
-        if (!shouldShow) blurPost(postElement);
+    const { customGeminiKey, customICP, postAction, accessToken } = await chrome.storage.local.get([
+        'customGeminiKey',
+        'customICP',
+        'postAction',
+        'accessToken'
+    ]);
+
+    // Must have either custom key or access token
+    if (!customGeminiKey && !accessToken) {
         return;
     }
 
-    const { customGeminiKey, customICP } = await chrome.storage.local.get([
-        'customGeminiKey',
-        'customICP'
-    ]);
-
-    if (!customGeminiKey) return;
+    const action = postAction || 'blur';
+    
+    if (processedProfiles.has(cacheKey)) {
+        const shouldShow = processedProfiles.get(cacheKey);
+        if (!shouldShow) {
+            if (action === 'remove') {
+                removePost(postElement);
+            } else {
+                blurPost(postElement);
+            }
+        }
+        return;
+    }
 
     try {
-        const result = await analyzeWithGemini(profileData, customGeminiKey, customICP);
+        let result;
+        
+        // Prefer custom Gemini key if available
+        if (customGeminiKey) {
+            result = await analyzeWithGemini(profileData, customGeminiKey, customICP);
+        } 
+        // Otherwise use authr backend API with access token
+        else if (accessToken) {
+            const response = await fetch(`${API_BASE}/api/extension/filtering`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${accessToken}`
+                },
+                body: JSON.stringify({ profileData })
+            });
+
+            if (response.status === 401) {
+                await chrome.storage.local.remove(['accessToken', 'refreshToken', 'expiresAt']);
+                return;
+            }
+
+            if (!response.ok) {
+                return;
+            }
+
+            result = await response.json();
+        }
+
         processedProfiles.set(cacheKey, result.shouldShow);
 
         if (!result.shouldShow) {
-            blurPost(postElement);
+            if (action === 'remove') {
+                removePost(postElement);
+            } else {
+                blurPost(postElement);
+            }
         }
     } catch (error) {
-        console.error('Profile analysis failed:', error);
+        // Silent fail
     }
 }
 
@@ -125,12 +179,40 @@ function extractProfileData(postElement) {
     };
 }
 
+function removePost(postElement) {
+    const parent = postElement.closest('.feed-shared-update-v2__control-menu-container');
+    if (!parent) return;
+
+    if (parent.dataset.removed === 'true') return;
+    parent.dataset.removed = 'true';
+
+    // Increment counter
+    hiddenPostsCount++;
+    updateCounterBadge();
+
+    // Smoothly fade out and remove
+    parent.style.transition = 'opacity 0.3s ease, max-height 0.3s ease, margin 0.3s ease';
+    parent.style.opacity = '0';
+    parent.style.maxHeight = '0';
+    parent.style.overflow = 'hidden';
+    parent.style.marginTop = '0';
+    parent.style.marginBottom = '0';
+
+    setTimeout(() => {
+        parent.remove();
+    }, 300);
+}
+
 function blurPost(postElement) {
     const parent = postElement.closest('.feed-shared-update-v2__control-menu-container');
     if (!parent) return;
 
     if (parent.dataset.blurred === 'true') return;
     parent.dataset.blurred = 'true';
+
+    // Increment counter
+    hiddenPostsCount++;
+    updateCounterBadge();
 
     const wrapper = document.createElement('div');
     while (parent.firstChild) wrapper.appendChild(parent.firstChild);
@@ -139,18 +221,19 @@ function blurPost(postElement) {
 
     const btn = document.createElement('button');
     btn.innerHTML = `
-        <span style="display: flex; align-items: center; gap: 8px; white-space: nowrap;">
-            <span>Show Post</span>
-            <span style="opacity: 0.9; font-size: 11px; font-weight: 500; letter-spacing: 0.3px;">authr</span>
+        <span style="display: flex; align-items: center; text-align:center; gap: 8px; white-space: nowrap;">
+            <span>View Post</span>
         </span>
     `;
+
+    const text = document.createElement('span');
     btn.style.cssText = `
-        position: absolute;
+    position: absolute;
         top: 50%;
         left: 50%;
         transform: translate(-50%, -50%);
         z-index: 10;
-        background: #1AB394;
+        background: #37a791e8;
         color: white;
         border: none;
         padding: 10px 22px;
@@ -161,11 +244,11 @@ function blurPost(postElement) {
         font-family: -apple-system, BlinkMacSystemFont, 'DM Sans', sans-serif;
         box-shadow: 0 2px 8px rgba(26, 179, 148, 0.3);
         transition: all 0.2s ease;
-    `;
-
-    btn.onmouseover = () => {
-        btn.style.background = '#0D9488';
-        btn.style.transform = 'translate(-50%, -50%) scale(1.05)';
+        `;
+        
+        btn.onmouseover = () => {
+            btn.style.background = '#0D9488';
+            btn.style.transform = 'translate(-50%, -50%) scale(1.05)';
     };
     btn.onmouseout = () => {
         btn.style.background = '#1AB394';
@@ -174,12 +257,37 @@ function blurPost(postElement) {
     btn.onclick = () => {
         wrapper.style.filter = '';
         btn.remove();
+        text.remove();
         parent.dataset.revealed = 'true';
+        
+        // Decrement counter when revealed
+        hiddenPostsCount--;
+        updateCounterBadge();
     };
+
+   text.innerHTML = `
+  <span style="opacity: 0.9; font-size: 13px; font-weight: 300; letter-spacing: 0.3px; color: rgba(255,255,255,0.7);">
+    Hidden by <span style="color: #ffffff; font-weight: 500;">authr</span>
+  </span>
+`;
+
+    text.style.cssText = `
+  position: absolute;
+  top: calc(50% + 28px);
+  left: 50%;
+  transform: translateX(-50%);
+  font-size: 12px;
+  opacity: 0.6;
+  z-index: 10;
+  font-family: -apple-system, BlinkMacSystemFont, 'DM Sans', sans-serif;
+`;
+
 
     parent.style.position = 'relative';
     parent.appendChild(wrapper);
     parent.appendChild(btn);
+    parent.appendChild(text);
+
 }
 
 function processExistingPosts() {
@@ -220,9 +328,138 @@ function unblurAllPosts() {
         parent.dataset.blurred = 'false';
         parent.dataset.revealed = 'true';
     });
+    
+    // Reset counter
+    hiddenPostsCount = 0;
+    updateCounterBadge();
+}
+
+function createCounterBadge() {
+    if (counterBadge) return;
+
+    counterBadge = document.createElement('div');
+    counterBadge.id = 'authr-counter-badge';
+    counterBadge.style.cssText = `
+        position: fixed;
+        bottom: 24px;
+        right: 24px;
+        background: linear-gradient(135deg, #1AB394 0%, #0D9488 100%);
+        color: white;
+        padding: 10px 16px 10px 16px;
+        padding-right: 12px;
+        border-radius: 20px;
+        font-family: -apple-system, BlinkMacSystemFont, 'DM Sans', sans-serif;
+        font-size: 13px;
+        font-weight: 600;
+        box-shadow: 0 4px 12px rgba(26, 179, 148, 0.4);
+        z-index: 9999;
+        display: none;
+        align-items: center;
+        gap: 8px;
+        transition: all 0.3s ease;
+        cursor: default;
+    `;
+
+    counterBadge.innerHTML = `
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/>
+            <circle cx="12" cy="12" r="3"/>
+            <line x1="2" y1="2" x2="22" y2="22"/>
+        </svg>
+        <span id="authr-counter-text">0 posts hidden</span>
+        <button id="authr-counter-close" style="
+            background: transparent;
+            border: none;
+            cursor: pointer;
+            padding: 2px;
+            margin-left: 4px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            opacity: 0.7;
+            transition: opacity 0.2s;
+        ">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                <line x1="18" y1="6" x2="6" y2="18"/>
+                <line x1="6" y1="6" x2="18" y2="18"/>
+            </svg>
+        </button>
+    `;
+
+    document.body.appendChild(counterBadge);
+
+    // Add close button handler
+    const closeBtn = document.getElementById('authr-counter-close');
+    if (closeBtn) {
+        closeBtn.onmouseover = () => closeBtn.style.opacity = '1';
+        closeBtn.onmouseout = () => closeBtn.style.opacity = '0.7';
+        closeBtn.onclick = () => {
+            counterBadge.style.display = 'none';
+            // Save preference to hide counter
+            chrome.storage.local.set({ showCounter: false });
+        };
+    }
+}
+
+function updateCounterBadge() {
+    if (!counterBadge) return;
+
+    chrome.storage.local.get(['showCounter'], ({ showCounter }) => {
+        const counterText = document.getElementById('authr-counter-text');
+        if (!counterText) return;
+
+        // Default to true if not set
+        const shouldShow = showCounter !== false;
+
+        if (hiddenPostsCount > 0 && shouldShow) {
+            counterText.textContent = `${hiddenPostsCount} post${hiddenPostsCount === 1 ? '' : 's'} hidden`;
+            counterBadge.style.display = 'flex';
+        } else {
+            counterBadge.style.display = 'none';
+        }
+    });
 }
 
 async function analyzeWithGemini(profileData, apiKey, customICP) {
+    try {
+        // Check if user is an authr user (has access token)
+        const { accessToken, isAuthrUser } = await chrome.storage.local.get(['accessToken', 'isAuthrUser']);
+
+        if (isAuthrUser && accessToken) {
+            // Use authr API for authenticated users
+            return await analyzeWithAuthrAPI(profileData, accessToken);
+        }
+
+        // Fall back to direct Gemini API for free users
+        return await analyzeWithDirectGemini(profileData, apiKey, customICP);
+    } catch (error) {
+        return { shouldShow: true }; // Default to show on error
+    }
+}
+
+async function analyzeWithAuthrAPI(profileData, accessToken) {
+    try {
+        const response = await fetch(`${CONFIG.API_BASE_URL}/api/extension/filtering`, {
+            method: 'POST',
+            headers: { 
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${accessToken}`
+            },
+            body: JSON.stringify({ profileData })
+        });
+
+        if (!response.ok) {
+            return { shouldShow: true }; // Default to show on error
+        }
+
+        const data = await response.json();
+        return { shouldShow: data.shouldShow };
+    } catch (error) {
+        return { shouldShow: true }; // Default to show on error
+    }
+}
+
+async function analyzeWithDirectGemini(profileData, apiKey, customICP) {
     try {
         // Always hide promoted content and job postings
         if (profileData.isPromoted || profileData.isJobPosting) {
@@ -258,7 +495,7 @@ Instructions:
 Answer with exactly one word: SHOW or HIDE`;
 
         const response = await fetch(
-            `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash-exp:generateContent?key=${apiKey}`,
+            `${CONFIG.GEMINI_API_ENDPOINT}?key=${apiKey}`,
             {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
@@ -274,8 +511,6 @@ Answer with exactly one word: SHOW or HIDE`;
         );
 
         if (!response.ok) {
-            const errorText = await response.text();
-            console.error('Gemini API error:', response.status, errorText);
             return { shouldShow: true }; // Default to show on error
         }
 
@@ -295,19 +530,8 @@ Answer with exactly one word: SHOW or HIDE`;
             shouldShow = firstWord === 'SHOW';
         }
         
-        // Debug logging (can be removed in production)
-        if (responseText && responseText !== 'SHOW' && responseText !== 'HIDE') {
-            console.log('[authr] ICP Analysis:', {
-                profile: profileData.name,
-                headline: profileData.headline.substring(0, 50),
-                response: responseText,
-                decision: shouldShow ? 'SHOW' : 'HIDE'
-            });
-        }
-        
         return { shouldShow };
     } catch (error) {
-        console.error('Gemini analysis failed:', error);
         return { shouldShow: true }; // Default to show on error
     }
 }

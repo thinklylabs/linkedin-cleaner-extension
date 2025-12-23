@@ -29,6 +29,12 @@
       margin-bottom: 24px;
     }
 
+    .header-right {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
     .logo {
       display: flex;
       align-items: center;
@@ -283,7 +289,17 @@
 
     .footer-text {
       font-size: 10px;
-      color: #444;
+      color: #5c5c5c;
+    }
+    .footer-text-1 {
+      font-size: 12px;
+      color: #5c5c5c;
+    }
+
+    .footer-text-1 a {
+      font-size: 12px;
+      color: #1AB394;
+
     }
 
     .hidden {
@@ -320,69 +336,350 @@
     input[type="text"].api-key-input {
       padding-right: 40px;
     }
+
+    /* Auth Screen */
+    .auth-container {
+      text-align: center;
+      padding: 32px 0;
+    }
+
+    .auth-title {
+      font-size: 20px;
+      font-weight: 600;
+      margin-bottom: 8px;
+      color: #FAFAFA;
+    }
+
+    .auth-subtitle {
+      font-size: 13px;
+      color: #888;
+      margin-bottom: 32px;
+    }
+
+    .auth-btn {
+      width: 100%;
+      border: none;
+      border-radius: 10px;
+      padding: 14px;
+      font-size: 14px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.2s ease;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      font-family: 'DM Sans', sans-serif;
+    }
+
+    .auth-btn.primary {
+      background: linear-gradient(135deg, #1AB394 0%, #0D9488 100%);
+      color: white;
+      margin-bottom: 12px;
+    }
+
+    .auth-btn.primary:hover {
+      transform: translateY(-1px);
+      box-shadow: 0 4px 12px rgba(26, 179, 148, 0.3);
+    }
+
+    .auth-btn.secondary {
+      background: transparent;
+      color: #888;
+      border: 1px solid #252525;
+      font-size: 12px;
+      padding: 10px;
+    }
+
+    .auth-btn.secondary:hover {
+      color: #FAFAFA;
+      border-color: #3A3A3A;
+    }
+
+    /* Icon Button */
+    .icon-btn {
+      background: transparent;
+      border: none;
+      cursor: pointer;
+      padding: 6px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      border-radius: 8px;
+      transition: all 0.2s ease;
+    }
+
+    .icon-btn svg {
+      stroke: #888;
+      transition: stroke 0.2s;
+    }
+
+    .icon-btn:hover {
+      background: #1A1A1A;
+    }
+
+    .icon-btn:hover svg {
+      stroke: #FAFAFA;
+    }
+
+    /* Settings Button with Text */
+    .settings-btn {
+      background: transparent;
+      border: 1px solid #252525;
+      cursor: pointer;
+      padding: 8px 14px;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      border-radius: 8px;
+      transition: all 0.2s ease;
+      font-family: 'DM Sans', sans-serif;
+      font-size: 12px;
+      font-weight: 500;
+      color: #888;
+    }
+
+    .settings-btn svg {
+      width: 16px;
+      height: 16px;
+      stroke: #888;
+      transition: stroke 0.2s;
+    }
+
+    .settings-btn:hover {
+      background: #1A1A1A;
+      border-color: #3A3A3A;
+      color: #FAFAFA;
+    }
+
+    .settings-btn:hover svg {
+      stroke: #FAFAFA;
+    }
+
+    /* Settings Screen */
+    .settings-section {
+      margin-bottom: 24px;
+    }
+
+    .section-title {
+      font-size: 11px;
+      font-weight: 600;
+      color: #666;
+      letter-spacing: 0.5px;
+      margin-bottom: 16px;
+    }
+
+    .radio-group {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+
+    .radio-option {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 12px 14px;
+      background: #1A1A1A;
+      border: 1px solid #252525;
+      border-radius: 10px;
+      cursor: pointer;
+      transition: all 0.2s ease;
+    }
+
+    .radio-option:hover {
+      border-color: #3A3A3A;
+    }
+
+    .radio-option input[type="radio"] {
+      width: 18px;
+      height: 18px;
+      margin: 0;
+      cursor: pointer;
+      accent-color: #1AB394;
+    }
+
+    .radio-label {
+      font-size: 13px;
+      color: #FAFAFA;
+      cursor: pointer;
+    }
   </style>
 </head>
 
 <body>
-  <div class="header">
-    <div class="logo">
-      <div class="logo-icon">
-        <img src="../images/authr logo.png" alt="authr logo">
+  <!-- Auth Screen -->
+  <div id="auth-screen">
+    <div class="header">
+      <div class="logo">
+        <div class="logo-icon">
+          <img src="../images/authr logo.png" alt="authr logo">
+        </div>
+        <span class="logo-text">Authr</span>
       </div>
-      <span class="logo-text">Authr</span>
     </div>
-    <div class="status-dot" id="status-dot"></div>
+
+    <div class="auth-container">
+      <h2 class="auth-title">Welcome to Authr</h2>
+      <p class="auth-subtitle">Clean your LinkedIn feed with AI</p>
+      
+      <button class="auth-btn primary" id="signin-authr-btn">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/>
+          <circle cx="12" cy="7" r="4"/>
+        </svg>
+        Sign In with authr
+      </button>
+      
+      <button class="auth-btn secondary" id="continue-without-btn">
+        Continue without authr
+      </button>
+    </div>
   </div>
 
-  <div class="main-toggle">
-    <div class="toggle-row">
-      <div>
-        <div class="toggle-label">Filter Active</div>
-        <div class="toggle-sublabel" id="toggle-sublabel">Add API key to start</div>
+  <!-- Manual Key Screen -->
+  <div id="manual-key-screen" class="hidden">
+    <div class="header">
+      <div class="logo">
+        <div class="logo-icon">
+          <img src="../images/authr logo.png" alt="authr logo">
+        </div>
+        <span class="logo-text">Authr</span>
       </div>
-      <button class="toggle-switch" id="filter-toggle" disabled></button>
-    </div>
-  </div>
-
-  <div class="config-section">
-    <div class="config-label">Gemini API Key</div>
-    <div class="input-wrapper">
-      <input 
-        type="password" 
-        id="api-key-input" 
-        class="api-key-input"
-        placeholder="AIza..."
-        autocomplete="off"
-      />
-      <button class="eye-btn" id="toggle-visibility" type="button">
-        <svg id="eye-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-          <path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7Z"/>
-          <circle cx="12" cy="12" r="3"/>
+      <button class="icon-btn" id="back-to-auth-btn">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M19 12H5M12 19l-7-7 7-7"/>
         </svg>
       </button>
     </div>
-    <div class="input-hint">
-      Get yours free at <a href="https://aistudio.google.com/apikey" target="_blank">Google AI Studio</a>
+
+    <div class="config-section">
+      <div class="config-label">Gemini API Key</div>
+      <div class="input-wrapper">
+        <input 
+          type="password" 
+          id="api-key-input" 
+          class="api-key-input"
+          placeholder="AIza..."
+          autocomplete="off"
+        />
+        <button class="eye-btn" id="toggle-visibility" type="button">
+          <svg id="eye-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7Z"/>
+            <circle cx="12" cy="12" r="3"/>
+          </svg>
+        </button>
+      </div>
+      <div class="input-hint">
+        Get yours for free at <a href="https://aistudio.google.com/apikey" target="_blank">Google AI Studio</a>
+      </div>
+    </div>
+
+    <button class="save-btn" id="save-key-btn">Save & Continue</button>
+    
+    <div class="status-msg" id="key-status-msg"></div>
+  </div>
+
+  <!-- Main Screen -->
+  <div id="main-screen" class="hidden">
+    <div class="header">
+      <div class="logo">
+        <div class="logo-icon">
+          <img src="../images/authr logo.png" alt="authr logo">
+        </div>
+        <span class="logo-text">Authr</span>
+      </div>
+      <div class="header-right">
+        <div class="status-dot" id="status-dot"></div>
+        <button class="settings-btn" id="settings-btn">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"></svg>
+            <circle cx="12" cy="12" r="3"/>
+            <path d="M12 1v6m0 6v6M5.64 5.64l4.24 4.24m4.24 4.24l4.24 4.24M1 12h6m6 0h6M5.64 18.36l4.24-4.24m4.24-4.24l4.24-4.24"/>
+          </svg>
+          <span>Filter Settings</span>
+        </button>
+      </div>
+    </div>
+
+    <div class="main-toggle">
+      <div class="toggle-row">
+        <div>
+          <div class="toggle-label">Filter Active</div>
+          <div class="toggle-sublabel" id="toggle-sublabel">Filtering your feed</div>
+        </div>
+        <button class="toggle-switch active" id="filter-toggle"></button>
+      </div>
     </div>
   </div>
 
-  <div class="config-section">
-    <div class="config-label">Target Audience <span style="opacity: 0.5;">(optional)</span></div>
-    <textarea 
-      id="icp-input" 
-      placeholder="e.g., Tech founders, VCs, AI researchers..."
-    ></textarea>
-    <div class="input-hint">Posts from matching profiles stay visible</div>
+  <!-- Settings Screen -->
+  <div id="settings-screen" class="hidden">
+    <div class="header">
+      <button class="icon-btn" id="back-to-main-btn">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M19 12H5M12 19l-7-7 7-7"/>
+        </svg>
+      </button>
+      <div class="logo">
+        <span class="logo-text">Settings</span>
+      </div>
+      <div style="width: 32px;"></div>
+    </div>
+
+    <div class="settings-section">
+      <div class="section-title">FILTERING</div>
+      
+      <div class="config-section">
+        <div class="config-label">Post Action</div>
+        <div class="radio-group">
+          <label class="radio-option">
+            <input type="radio" name="post-action" value="blur" id="action-blur" checked>
+            <span class="radio-label">Blur Posts</span>
+          </label>
+          <label class="radio-option">
+            <input type="radio" name="post-action" value="remove" id="action-remove">
+            <span class="radio-label">Remove Posts Completely</span>
+          </label>
+        </div>
+      </div>
+
+      <div class="config-section">
+        <div class="main-toggle" style="margin-bottom: 0;">
+          <div class="toggle-row">
+            <div>
+              <div class="toggle-label">Show Counter</div>
+              <div class="toggle-sublabel">Display hidden posts count</div>
+            </div>
+            <button class="toggle-switch active" id="counter-toggle"></button>
+          </div>
+        </div>
+      </div>
+
+      <div class="config-section" id="icp-section">
+        <div class="config-label">Target Audience <span style="opacity: 0.5;">(optional)</span></div>
+        <textarea 
+          id="icp-input" 
+          placeholder="e.g., Tech founders, VCs, AI researchers..."
+        ></textarea>
+        <div class="input-hint">Posts from matching profiles stay visible</div>
+      </div>
+    </div>
+
+    <div class="divider"></div>
+
+    <div class="settings-section">
+      <div class="section-title">ACCOUNT</div>
+      <button class="clear-btn" id="signout-btn" style="margin-bottom: 12px; display: none;">Sign Out</button>
+      <button class="clear-btn" id="remove-key-btn" style="margin-bottom: 12px; display: none;">Remove API Key</button>
+      <!-- <button class="clear-btn" id="clear-btn">Clear All Settings</button> -->
+    </div>
+
+    <button class="save-btn" id="save-settings-btn">Save Settings</button>
+    <div class="status-msg" id="settings-status-msg"></div>
   </div>
 
-  <button class="save-btn" id="save-btn">Save Settings</button>
-  
-  <div class="status-msg" id="status-msg"></div>
-
-  <div class="divider" id="clear-divider" style="display: none;"></div>
-  <button class="clear-btn hidden" id="clear-btn">Clear Settings</button>
-
   <div class="footer">
+    <div class="footer-text-1">By team <a href="https://authr-ai.com" target="_blank">authr-ai</a></div>
     <div class="footer-text">Powered by Gemini AI</div>
   </div>
 
