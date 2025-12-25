@@ -95,6 +95,32 @@ async function validateGeminiKey(apiKey) {
 
 // Event Listeners
 document.addEventListener('DOMContentLoaded', () => {
+  // Load saved theme (default to light mode)
+  chrome.storage.local.get(['theme'], ({ theme }) => {
+    if (theme === 'dark') {
+      document.body.classList.remove('light-mode');
+    } else {
+      // Default to light mode
+      document.body.classList.add('light-mode');
+    }
+  });
+
+  // Theme toggle handlers
+  const themeToggles = [
+    'theme-toggle-auth',
+    'theme-toggle-manual',
+    'theme-toggle-main',
+    'theme-toggle-settings'
+  ];
+
+  themeToggles.forEach(id => {
+    document.getElementById(id)?.addEventListener('click', () => {
+      document.body.classList.toggle('light-mode');
+      const theme = document.body.classList.contains('light-mode') ? 'light' : 'dark';
+      chrome.storage.local.set({ theme });
+    });
+  });
+
   // Auth screen - Sign in with authr
   document.getElementById('signin-authr-btn')?.addEventListener('click', () => {
     chrome.tabs.create({ url: AUTH_URL });

@@ -20,6 +20,134 @@
       background: #0D0D0D;
       color: #FAFAFA;
       padding: 24px;
+      transition: background-color 0.3s ease, color 0.3s ease;
+    }
+
+    /* Light mode */
+    body.light-mode {
+      background: #F6F2EC;
+      color: #0D0D0D;
+    }
+
+    body.light-mode .main-toggle,
+    body.light-mode input,
+    body.light-mode textarea,
+    body.light-mode .radio-option {
+      background: #FFFFFF;
+      border-color: #E5E0D8;
+      color: #0D0D0D;
+    }
+
+    body.light-mode .toggle-label,
+    body.light-mode .radio-label {
+      color: #0D0D0D;
+    }
+
+    body.light-mode .config-label,
+    body.light-mode .section-title {
+      color: #666;
+    }
+
+    body.light-mode .toggle-sublabel,
+    body.light-mode .input-hint {
+      color: #888;
+    }
+
+    body.light-mode input::placeholder,
+    body.light-mode textarea::placeholder {
+      color: #AAA;
+    }
+
+    body.light-mode .toggle-switch {
+      background: #E5E0D8;
+    }
+
+    body.light-mode .toggle-switch.active {
+      background: #1AB394;
+    }
+
+    body.light-mode .status-dot {
+      background: #D0CBC3;
+    }
+
+    body.light-mode .status-dot.active {
+      background: #1AB394;
+      box-shadow: 0 0 12px rgba(26, 179, 148, 0.5);
+    }
+
+    body.light-mode .divider {
+      background: #E5E0D8;
+    }
+
+    body.light-mode .clear-btn {
+      color: #666;
+      border-color: #E5E0D8;
+    }
+
+    body.light-mode .clear-btn:hover {
+      color: #DC2626;
+      border-color: rgba(220, 38, 38, 0.3);
+      background: rgba(220, 38, 38, 0.05);
+    }
+
+    body.light-mode .settings-btn,
+    body.light-mode .icon-btn {
+      border-color: #E5E0D8;
+      color: #666;
+    }
+
+    body.light-mode .settings-btn:hover,
+    body.light-mode .icon-btn:hover {
+      background: #FFFFFF;
+      border-color: #D0CBC3;
+      color: #0D0D0D;
+    }
+
+    body.light-mode .settings-btn svg,
+    body.light-mode .icon-btn svg {
+      stroke: #666;
+    }
+
+    body.light-mode .settings-btn:hover svg,
+    body.light-mode .icon-btn:hover svg {
+      stroke: #0D0D0D;
+    }
+
+    body.light-mode .footer-text,
+    body.light-mode .footer-text-1 {
+      color: #888;
+    }
+
+    body.light-mode .auth-title {
+      color: #0D0D0D;
+    }
+
+    body.light-mode .auth-subtitle {
+      color: #666;
+    }
+
+    body.light-mode .auth-btn.secondary {
+      color: #666;
+      border-color: #E5E0D8;
+    }
+
+    body.light-mode .radio-option input[type="radio"] {
+      accent-color: #1AB394;
+      outline: none;
+    }
+
+    body.light-mode .radio-option input[type="radio"]:focus {
+      outline: none;
+      box-shadow: none;
+    }
+
+    body.light-mode .radio-option input[type="radio"]:focus-visible {
+      outline: 2px solid #1AB394;
+      outline-offset: 2px;
+    }
+
+    body.light-mode .radio-option:hover {
+      border-color: #D0CBC3;
     }
 
     .header {
@@ -27,6 +155,12 @@
       align-items: center;
       justify-content: space-between;
       margin-bottom: 24px;
+    }
+
+    .header-left {
+      display: flex;
+      align-items: center;
+      gap: 12px;
     }
 
     .header-right {
@@ -53,6 +187,19 @@
       width: 100%;
       height: 100%;
       object-fit: contain;
+      transition: opacity 0.3s ease;
+    }
+
+    .logo-icon .logo-light {
+      display: none;
+    }
+
+    body.light-mode .logo-icon .logo-dark {
+      display: none;
+    }
+
+    body.light-mode .logo-icon .logo-light {
+      display: block;
     }
 
     .logo-text {
@@ -422,6 +569,41 @@
       stroke: #FAFAFA;
     }
 
+    /* Theme toggle button */
+    .theme-toggle {
+      background: transparent;
+      border: none;
+      cursor: pointer;
+      padding: 6px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      border-radius: 8px;
+      transition: all 0.2s ease;
+    }
+
+    .theme-toggle svg {
+      stroke: #888;
+      fill: none;
+      transition: all 0.2s;
+    }
+
+    .theme-toggle:hover {
+      background: #1A1A1A;
+    }
+
+    .theme-toggle:hover svg {
+      stroke: #FAFAFA;
+    }
+
+    body.light-mode .theme-toggle:hover {
+      background: #FFFFFF;
+    }
+
+    body.light-mode .theme-toggle:hover svg {
+      stroke: #0D0D0D;
+    }
+
     /* Settings Button with Text */
     .settings-btn {
       background: transparent;
@@ -513,10 +695,24 @@
     <div class="header">
       <div class="logo">
         <div class="logo-icon">
-          <img src="../images/authr logo.png" alt="authr logo">
+          <img src="../images/authr logo.png" alt="authr logo" class="logo-dark">
+          <img src="../images/authr logo dark.png" alt="authr logo" class="logo-light">
         </div>
         <span class="logo-text">Authr</span>
       </div>
+      <button class="theme-toggle" id="theme-toggle-auth">
+        <svg width="20" height="20" viewBox="0 0 24 24" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <circle cx="12" cy="12" r="5"/>
+          <line x1="12" y1="1" x2="12" y2="3"/>
+          <line x1="12" y1="21" x2="12" y2="23"/>
+          <line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/>
+          <line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/>
+          <line x1="1" y1="12" x2="3" y2="12"/>
+          <line x1="21" y1="12" x2="23" y2="12"/>
+          <line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/>
+          <line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/>
+        </svg>
+      </button>
     </div>
 
     <div class="auth-container">
@@ -540,15 +736,31 @@
   <!-- Manual Key Screen -->
   <div id="manual-key-screen" class="hidden">
     <div class="header">
-      <div class="logo">
-        <div class="logo-icon">
-          <img src="../images/authr logo.png" alt="authr logo">
+      <div class="header-left">
+        <button class="icon-btn" id="back-to-auth-btn">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M19 12H5M12 19l-7-7 7-7"/>
+          </svg>
+        </button>
+        <div class="logo">
+          <div class="logo-icon">
+            <img src="../images/authr logo.png" alt="authr logo" class="logo-dark">
+            <img src="../images/authr logo dark.png" alt="authr logo" class="logo-light">
+          </div>
+          <span class="logo-text">Authr</span>
         </div>
-        <span class="logo-text">Authr</span>
       </div>
-      <button class="icon-btn" id="back-to-auth-btn">
-        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-          <path d="M19 12H5M12 19l-7-7 7-7"/>
+      <button class="theme-toggle" id="theme-toggle-manual">
+        <svg width="20" height="20" viewBox="0 0 24 24" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <circle cx="12" cy="12" r="5"/>
+          <line x1="12" y1="1" x2="12" y2="3"/>
+          <line x1="12" y1="21" x2="12" y2="23"/>
+          <line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/>
+          <line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/>
+          <line x1="1" y1="12" x2="3" y2="12"/>
+          <line x1="21" y1="12" x2="23" y2="12"/>
+          <line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/>
+          <line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/>
         </svg>
       </button>
     </div>
@@ -585,14 +797,28 @@
     <div class="header">
       <div class="logo">
         <div class="logo-icon">
-          <img src="../images/authr logo.png" alt="authr logo">
+          <img src="../images/authr logo.png" alt="authr logo" class="logo-dark">
+          <img src="../images/authr logo dark.png" alt="authr logo" class="logo-light">
         </div>
         <span class="logo-text">Authr</span>
       </div>
       <div class="header-right">
+        <button class="theme-toggle" id="theme-toggle-main">
+          <svg width="20" height="20" viewBox="0 0 24 24" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <circle cx="12" cy="12" r="5"/>
+            <line x1="12" y1="1" x2="12" y2="3"/>
+            <line x1="12" y1="21" x2="12" y2="23"/>
+            <line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/>
+            <line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/>
+            <line x1="1" y1="12" x2="3" y2="12"/>
+            <line x1="21" y1="12" x2="23" y2="12"/>
+            <line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/>
+            <line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/>
+          </svg>
+        </button>
         <div class="status-dot" id="status-dot"></div>
         <button class="settings-btn" id="settings-btn">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"></svg>
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
             <circle cx="12" cy="12" r="3"/>
             <path d="M12 1v6m0 6v6M5.64 5.64l4.24 4.24m4.24 4.24l4.24 4.24M1 12h6m6 0h6M5.64 18.36l4.24-4.24m4.24-4.24l4.24-4.24"/>
           </svg>
@@ -623,7 +849,19 @@
       <div class="logo">
         <span class="logo-text">Settings</span>
       </div>
-      <div style="width: 32px;"></div>
+      <button class="theme-toggle" id="theme-toggle-settings">
+        <svg width="20" height="20" viewBox="0 0 24 24" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <circle cx="12" cy="12" r="5"/>
+          <line x1="12" y1="1" x2="12" y2="3"/>
+          <line x1="12" y1="21" x2="12" y2="23"/>
+          <line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/>
+          <line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/>
+          <line x1="1" y1="12" x2="3" y2="12"/>
+          <line x1="21" y1="12" x2="23" y2="12"/>
+          <line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/>
+          <line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/>
+        </svg>
+      </button>
     </div>
 
     <div class="settings-section">
@@ -643,6 +881,15 @@
         </div>
       </div>
 
+      <div class="config-section" id="icp-section">
+        <div class="config-label">Target Audience <span style="opacity: 0.5;">(optional)</span></div>
+        <textarea 
+          id="icp-input" 
+          placeholder="e.g., Tech founders, VCs, AI researchers..."
+        ></textarea>
+        <div class="input-hint">Posts from matching profiles stay visible</div>
+      </div>
+
       <div class="config-section">
         <div class="main-toggle" style="margin-bottom: 0;">
           <div class="toggle-row">
@@ -655,14 +902,7 @@
         </div>
       </div>
 
-      <div class="config-section" id="icp-section">
-        <div class="config-label">Target Audience <span style="opacity: 0.5;">(optional)</span></div>
-        <textarea 
-          id="icp-input" 
-          placeholder="e.g., Tech founders, VCs, AI researchers..."
-        ></textarea>
-        <div class="input-hint">Posts from matching profiles stay visible</div>
-      </div>
+      
     </div>
 
     <div class="divider"></div>
