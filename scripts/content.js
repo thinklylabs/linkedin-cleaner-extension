@@ -471,26 +471,53 @@ async function analyzeWithDirectGemini(profileData, apiKey, customICP) {
             return { shouldShow: true };
         }
 
-        // Improved ICP matching prompt
+        // Improved ICP matching prompt with spam and AI detection
         const postPreview = profileData.postText ? profileData.postText.substring(0, 400).trim() : '';
         
-        const prompt = `You are filtering LinkedIn posts to show only content from your target audience.
+        const prompt = `You are filtering LinkedIn posts to EXCLUSIVELY show only content from people who match the target audience. Your goal is to create a high-quality, relevant feed.
 
-TARGET AUDIENCE:
+TARGET AUDIENCE (ICP):
 ${customICP}
 
 PROFILE:
 Name: ${profileData.name || 'Unknown'}
 Headline: ${profileData.headline || 'Not available'}
-${postPreview ? `Post: ${postPreview}` : ''}
+${postPreview ? `Post Content: ${postPreview}` : ''}
 
-Question: Does this profile or their post content match the target audience above?
+CRITICAL FILTERING RULES:
 
-Instructions:
-- Compare the profile headline and post content to the target audience description
-- SHOW if the person fits the target audience OR if their post discusses topics relevant to the target audience
-- HIDE if the person clearly doesn't fit AND their post isn't relevant to the target audience
-- Be practical: if there's any reasonable connection, SHOW it
+1. ICP MATCHING (STRICT):
+   - SHOW ONLY if the person's profile (headline, role, industry) clearly matches the target audience description
+   - The person must be in the ICP - do NOT show posts just because the topic is relevant if the person doesn't match
+   - HIDE if the person doesn't fit the ICP, even if their post discusses relevant topics
+
+2. SPAM DETECTION - HIDE if the post contains:
+   - Excessive emojis or special characters (more than 3-4 emojis)
+   - Clickbait phrases ("You won't believe...", "This will shock you...", "Number 3 will amaze you!")
+   - Excessive hashtags (more than 5-7 hashtags)
+   - Repetitive promotional content
+   - "Follow for more" or similar engagement bait
+   - Links to external products/services with aggressive sales language
+   - Posts that are clearly self-promotional without value
+
+3. AI-GENERATED/SLOP DETECTION - HIDE if the post:
+   - Has generic, formulaic structure ("Here are 5 ways...", "3 things you need to know...")
+   - Contains overly polished, corporate-speak language that lacks authenticity
+   - Has repetitive patterns typical of AI-generated content
+   - Lacks personal voice, anecdotes, or genuine insights
+   - Feels like it was written by a template or AI tool
+   - Contains phrases like "In today's fast-paced world..." or similar generic AI patterns
+
+4. QUALITY CHECK:
+   - Even if someone matches ICP, HIDE if their post is spam or AI slop
+   - Prioritize authentic, valuable content from ICP-matched profiles
+
+DECISION PROCESS:
+1. First, check if the person matches the ICP (based on headline/role/industry)
+2. If NO match → HIDE
+3. If YES match → Check for spam indicators → If spam → HIDE
+4. If YES match and not spam → Check for AI slop → If AI slop → HIDE
+5. Only SHOW if: Person matches ICP AND post is not spam AND post is not AI slop
 
 Answer with exactly one word: SHOW or HIDE`;
 
