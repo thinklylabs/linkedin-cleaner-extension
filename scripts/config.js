@@ -9,7 +9,7 @@ const CONFIG = {
     // API Base URL - Change this for your environment
     // Use 'http://localhost:3000' for development
     // Use 'https://authr-ai.com' for production
-    API_BASE_URL: 'http://localhost:3000'
+    API_BASE_URL: 'http://authr-ai.com'
 };
 
 // Export for use in other scripts
