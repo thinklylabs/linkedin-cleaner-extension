@@ -2,6 +2,12 @@
 
 const EXTENSION_ID = chrome.runtime.id;
 const AUTH_URL = `${CONFIG.API_BASE_URL}/extension-auth?extensionId=${EXTENSION_ID}`;
+const GEMINI_MODEL_CANDIDATES = [
+  'gemini-2.5-flash-lite',
+  'gemini-2.5-flash',
+  'gemini-1.5-flash',
+  'gemini-1.5-flash-8b'
+];
 
 // Screen management
 const screens = {
@@ -74,10 +80,50 @@ function hideStatus(elementId) {
   }
 }
 
-async function validateGeminiKey(apiKey) {
+function normalizeModelName(modelName) {
+  return (modelName || '').replace(/^models\//, '').trim();
+}
+
+function buildGenerateContentUrl(modelName, apiKey) {
+  return `${CONFIG.GEMINI_API_BASE}/${modelName}:generateContent?key=${encodeURIComponent(apiKey)}`;
+}
+
+async function discoverWorkingModel(apiKey) {
   try {
     const response = await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash-exp:generateContent?key=${apiKey}`,
+      `https://generativelanguage.googleapis.com/v1beta/models?key=${encodeURIComponent(apiKey)}`
+    );
+    const data = await response.json();
+
+    if (!response.ok) {
+      return { model: null, error: data?.error?.message || 'Unable to fetch available models for this API key' };
+    }
+
+    const models = (data.models || [])
+      .filter(model => (model.supportedGenerationMethods || []).includes('generateContent'))
+      .map(model => normalizeModelName(model.name))
+      .filter(Boolean);
+
+    if (models.length === 0) {
+      return { model: null, error: 'No generateContent model is enabled for this API key' };
+    }
+
+    const preferredModel = GEMINI_MODEL_CANDIDATES.find(candidate => models.includes(candidate));
+    return { model: preferredModel || models[0], error: null };
+  } catch (error) {
+    return { model: null, error: 'Network error while checking available Gemini models' };
+  }
+}
+
+async function validateGeminiKey(apiKey) {
+  try {
+    const modelResult = await discoverWorkingModel(apiKey);
+    if (!modelResult.model) {
+      return { isValid: false, model: null, error: modelResult.error || 'No compatible model found for this API key' };
+    }
+
+    const response = await fetch(
+      buildGenerateContentUrl(modelResult.model, apiKey),
       {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -86,10 +132,19 @@ async function validateGeminiKey(apiKey) {
         })
       }
     );
-    return response.ok;
+    if (!response.ok) {
+      const data = await response.json().catch(() => ({}));
+      return {
+        isValid: false,
+        model: modelResult.model,
+        error: data?.error?.message || `Validation failed (${response.status})`
+      };
+    }
+
+    return { isValid: true, model: modelResult.model, error: null };
   } catch (error) {
     console.error('API validation error:', error);
-    return false;
+    return { isValid: false, model: null, error: 'Network error while validating API key' };
   }
 }
 
@@ -176,10 +231,10 @@ document.addEventListener('DOMContentLoaded', () => {
     saveBtn.textContent = 'Validating...';
     showStatus('key-status-msg', 'Checking API key...', 'loading');
 
-    const isValid = await validateGeminiKey(apiKey);
+    const validation = await validateGeminiKey(apiKey);
 
-    if (!isValid) {
-      showStatus('key-status-msg', 'Invalid API key', 'error');
+    if (!validation.isValid) {
+      showStatus('key-status-msg', validation.error || 'Invalid API key', 'error');
       saveBtn.disabled = false;
       saveBtn.textContent = 'Save & Continue';
       return;
@@ -187,6 +242,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     await chrome.storage.local.set({
       customGeminiKey: apiKey,
+      customGeminiModel: validation.model || CONFIG.GEMINI_DEFAULT_MODEL,
       filterEnabled: true,
       postAction: 'blur',
       showCounter: true

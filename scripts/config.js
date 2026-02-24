@@ -1,15 +1,14 @@
 // Configuration for the extension
 
 const CONFIG = {
-    GEMINI_API_ENDPOINT: 'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash-exp:generateContent',
+    GEMINI_API_BASE: 'https://generativelanguage.googleapis.com/v1beta/models',
+    GEMINI_DEFAULT_MODEL: 'gemini-2.5-flash-lite',
     POST_ACTIONS: {
         BLUR: 'blur',
         REMOVE: 'remove'
     },
-    // API Base URL - Change this for your environment
-    // Use 'http://localhost:3000' for development
-    // Use 'https://authr-ai.com' for production
-    API_BASE_URL: 'http://authr-ai.com'
+    // Production API base URL
+    API_BASE_URL: 'https://authr-ai.com'
 };
 
 // Export for use in other scripts

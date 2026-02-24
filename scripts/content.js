@@ -55,8 +55,9 @@ async function processPost(postElement) {
     const postHash = profileData.postText ? profileData.postText.substring(0, 100).replace(/\s+/g, ' ') : '';
     const cacheKey = `${profileData.name}_${profileData.headline}_${postHash}`;
     
-    const { customGeminiKey, customICP, postAction, accessToken } = await chrome.storage.local.get([
+    const { customGeminiKey, customGeminiModel, customICP, postAction, accessToken } = await chrome.storage.local.get([
         'customGeminiKey',
+        'customGeminiModel',
         'customICP',
         'postAction',
         'accessToken'
@@ -86,7 +87,7 @@ async function processPost(postElement) {
         
         // Prefer custom Gemini key if available
         if (customGeminiKey) {
-            result = await analyzeWithGemini(profileData, customGeminiKey, customICP);
+            result = await analyzeWithGemini(profileData, customGeminiKey, customGeminiModel, customICP);
         } 
         // Otherwise use authr backend API with access token
         else if (accessToken) {
@@ -420,7 +421,7 @@ function updateCounterBadge() {
     });
 }
 
-async function analyzeWithGemini(profileData, apiKey, customICP) {
+async function analyzeWithGemini(profileData, apiKey, customGeminiModel, customICP) {
     try {
         // Check if user is an authr user (has access token)
         const { accessToken, isAuthrUser } = await chrome.storage.local.get(['accessToken', 'isAuthrUser']);
@@ -431,7 +432,7 @@ async function analyzeWithGemini(profileData, apiKey, customICP) {
         }
 
         // Fall back to direct Gemini API for free users
-        return await analyzeWithDirectGemini(profileData, apiKey, customICP);
+        return await analyzeWithDirectGemini(profileData, apiKey, customGeminiModel, customICP);
     } catch (error) {
         return { shouldShow: true }; // Default to show on error
     }
@@ -459,7 +460,7 @@ async function analyzeWithAuthrAPI(profileData, accessToken) {
     }
 }
 
-async function analyzeWithDirectGemini(profileData, apiKey, customICP) {
+async function analyzeWithDirectGemini(profileData, apiKey, customGeminiModel, customICP) {
     try {
         // Always hide promoted content and job postings
         if (profileData.isPromoted || profileData.isJobPosting) {
@@ -521,8 +522,10 @@ DECISION PROCESS:
 
 Answer with exactly one word: SHOW or HIDE`;
 
+        const modelName = customGeminiModel || CONFIG.GEMINI_DEFAULT_MODEL;
+        const endpoint = `${CONFIG.GEMINI_API_BASE}/${modelName}:generateContent?key=${encodeURIComponent(apiKey)}`;
         const response = await fetch(
-            `${CONFIG.GEMINI_API_ENDPOINT}?key=${apiKey}`,
+            endpoint,
             {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
