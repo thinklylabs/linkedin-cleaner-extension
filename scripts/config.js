@@ -1,7 +1,7 @@
 // Configuration for the extension
 
 const CONFIG = {
-    GEMINI_API_ENDPOINT: 'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash-exp:generateContent',
+    GEMINI_API_ENDPOINT: 'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent',
     POST_ACTIONS: {
         BLUR: 'blur',
         REMOVE: 'remove'

@@ -30,7 +30,7 @@ async function init() {
   if (customGeminiKey || accessToken) {
     showScreen('main');
     updateMainScreen(filterEnabled !== false);
-    
+
     // Populate settings if navigating there
     if (customICP) {
       document.getElementById('icp-input').value = customICP;
@@ -77,7 +77,7 @@ function hideStatus(elementId) {
 async function validateGeminiKey(apiKey) {
   try {
     const response = await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash-exp:generateContent?key=${apiKey}`,
+      `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`,
       {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -140,7 +140,7 @@ document.addEventListener('DOMContentLoaded', () => {
   document.getElementById('toggle-visibility')?.addEventListener('click', () => {
     const input = document.getElementById('api-key-input');
     const eyeIcon = document.getElementById('eye-icon');
-    
+
     if (input.type === 'password') {
       input.type = 'text';
       eyeIcon.innerHTML = `
@@ -193,7 +193,7 @@ document.addEventListener('DOMContentLoaded', () => {
     });
 
     showStatus('key-status-msg', 'Saved! Redirecting...', 'success');
-    
+
     setTimeout(() => {
       saveBtn.disabled = false;
       saveBtn.textContent = 'Save & Continue';
@@ -206,13 +206,13 @@ document.addEventListener('DOMContentLoaded', () => {
   // Main screen - Settings button
   document.getElementById('settings-btn')?.addEventListener('click', async () => {
     const { customICP, postAction, showCounter, isAuthrUser, customGeminiKey } = await chrome.storage.local.get([
-      'customICP', 
-      'postAction', 
+      'customICP',
+      'postAction',
       'showCounter',
       'isAuthrUser',
       'customGeminiKey'
     ]);
-    
+
     // Show/hide ICP section based on user type
     const icpSection = document.getElementById('icp-section');
     if (isAuthrUser) {
@@ -225,10 +225,10 @@ document.addEventListener('DOMContentLoaded', () => {
         document.getElementById('icp-input').value = customICP;
       }
     }
-    
+
     const actionToCheck = postAction || 'blur';
     document.getElementById(`action-${actionToCheck}`).checked = true;
-    
+
     // Set counter toggle state (default to true)
     const counterToggle = document.getElementById('counter-toggle');
     if (showCounter !== false) {
@@ -236,11 +236,11 @@ document.addEventListener('DOMContentLoaded', () => {
     } else {
       counterToggle.classList.remove('active');
     }
-    
+
     // Show appropriate button based on auth type
     const signoutBtn = document.getElementById('signout-btn');
     const removeKeyBtn = document.getElementById('remove-key-btn');
-    
+
     if (isAuthrUser) {
       // User signed in with authr
       signoutBtn.style.display = 'block';
@@ -254,7 +254,7 @@ document.addEventListener('DOMContentLoaded', () => {
       signoutBtn.style.display = 'none';
       removeKeyBtn.style.display = 'none';
     }
-    
+
     showScreen('settings');
   });
 
@@ -262,7 +262,7 @@ document.addEventListener('DOMContentLoaded', () => {
   document.getElementById('filter-toggle')?.addEventListener('click', async () => {
     const { filterEnabled } = await chrome.storage.local.get(['filterEnabled']);
     const newState = filterEnabled === false ? true : false;
-    
+
     await chrome.storage.local.set({ filterEnabled: newState });
     updateMainScreen(newState);
     notifyContentScripts();
@@ -277,7 +277,7 @@ document.addEventListener('DOMContentLoaded', () => {
   document.getElementById('counter-toggle')?.addEventListener('click', async () => {
     const toggle = document.getElementById('counter-toggle');
     const isActive = toggle.classList.contains('active');
-    
+
     if (isActive) {
       toggle.classList.remove('active');
     } else {
@@ -289,14 +289,14 @@ document.addEventListener('DOMContentLoaded', () => {
   document.getElementById('save-settings-btn')?.addEventListener('click', async () => {
     const postAction = document.querySelector('input[name="post-action"]:checked').value;
     const showCounter = document.getElementById('counter-toggle').classList.contains('active');
-    
+
     const { isAuthrUser } = await chrome.storage.local.get(['isAuthrUser']);
-    
+
     const settingsToSave = {
       postAction: postAction,
       showCounter: showCounter
     };
-    
+
     // Only save ICP for free users (authr users have it in backend)
     if (!isAuthrUser) {
       const customICP = document.getElementById('icp-input').value.trim();
@@ -317,13 +317,13 @@ document.addEventListener('DOMContentLoaded', () => {
   document.getElementById('signout-btn')?.addEventListener('click', async () => {
     if (confirm('Sign out from authr? You\'ll need to sign in again to use the extension.')) {
       await chrome.storage.local.clear();
-      
+
       document.getElementById('api-key-input').value = '';
       document.getElementById('icp-input').value = '';
       document.getElementById('action-blur').checked = true;
-      
+
       showStatus('settings-status-msg', 'Signed out successfully', 'success');
-      
+
       setTimeout(() => {
         showScreen('auth');
         hideStatus('settings-status-msg');
@@ -335,13 +335,13 @@ document.addEventListener('DOMContentLoaded', () => {
   document.getElementById('remove-key-btn')?.addEventListener('click', async () => {
     if (confirm('Remove your API key? You\'ll need to add it again to use the extension.')) {
       await chrome.storage.local.clear();
-      
+
       document.getElementById('api-key-input').value = '';
       document.getElementById('icp-input').value = '';
       document.getElementById('action-blur').checked = true;
-      
+
       showStatus('settings-status-msg', 'API key removed', 'success');
-      
+
       setTimeout(() => {
         showScreen('auth');
         hideStatus('settings-status-msg');
@@ -353,13 +353,13 @@ document.addEventListener('DOMContentLoaded', () => {
   document.getElementById('clear-btn')?.addEventListener('click', async () => {
     if (confirm('Are you sure you want to clear all settings? This will sign you out.')) {
       await chrome.storage.local.clear();
-      
+
       document.getElementById('api-key-input').value = '';
       document.getElementById('icp-input').value = '';
       document.getElementById('action-blur').checked = true;
-      
+
       showStatus('settings-status-msg', 'Settings cleared', 'success');
-      
+
       setTimeout(() => {
         showScreen('auth');
         hideStatus('settings-status-msg');
@@ -377,7 +377,7 @@ function notifyContentScripts() {
     tabs.forEach(tab => {
       chrome.tabs.sendMessage(tab.id, {
         action: 'SETTINGS_UPDATED'
-      }).catch(() => {});
+      }).catch(() => { });
     });
   });
 }
