@@ -5,6 +5,11 @@ const API_BASE = CONFIG.API_BASE_URL;
 const processedProfiles = new Map();
 let hiddenPostsCount = 0;
 let counterBadge = null;
+const FEED_CONTAINER_SELECTORS = [
+    '.feed-shared-update-v2__control-menu-container',
+    '.feed-shared-update-v2',
+    '.occludable-update'
+];
 
 // Listen for messages from popup
 chrome.runtime.onMessage.addListener((request) => {
@@ -292,7 +297,7 @@ function blurPost(postElement) {
 }
 
 function processExistingPosts() {
-    const posts = document.querySelectorAll('.feed-shared-update-v2__control-menu-container');
+    const posts = collectFeedPostElements(document);
     posts.forEach(processPost);
 }
 
@@ -301,8 +306,8 @@ function observeNewPosts() {
         mutations.forEach(m => {
             m.addedNodes.forEach(node => {
                 if (node.nodeType === 1) {
-                    const newPosts = node.querySelectorAll?.('.feed-shared-update-v2__control-menu-container');
-                    if (newPosts && newPosts.length > 0) {
+                    const newPosts = collectFeedPostElements(node);
+                    if (newPosts.length > 0) {
                         newPosts.forEach(processPost);
                     }
                 }
@@ -314,7 +319,7 @@ function observeNewPosts() {
 }
 
 function unblurAllPosts() {
-    const posts = document.querySelectorAll('.feed-shared-update-v2__control-menu-container[data-blurred="true"]');
+    const posts = document.querySelectorAll('.feed-shared-update-v2__control-menu-container[data-blurred="true"], .feed-shared-update-v2[data-blurred="true"], .occludable-update[data-blurred="true"]');
     posts.forEach(parent => {
         const wrapper = parent.querySelector('div[style*="filter"]');
         const button = parent.querySelector('button');
@@ -412,13 +417,21 @@ function updateCounterBadge() {
         // Default to true if not set
         const shouldShow = showCounter !== false;
 
-        if (hiddenPostsCount > 0 && shouldShow) {
+        if (shouldShow) {
             counterText.textContent = `${hiddenPostsCount} post${hiddenPostsCount === 1 ? '' : 's'} hidden`;
             counterBadge.style.display = 'flex';
         } else {
             counterBadge.style.display = 'none';
         }
     });
+}
+
+function collectFeedPostElements(root) {
+    const elements = new Set();
+    FEED_CONTAINER_SELECTORS.forEach(selector => {
+        root.querySelectorAll?.(selector)?.forEach(el => elements.add(el));
+    });
+    return Array.from(elements);
 }
 
 async function analyzeWithGemini(profileData, apiKey, customGeminiModel, customICP) {
@@ -467,9 +480,10 @@ async function analyzeWithDirectGemini(profileData, apiKey, customGeminiModel, c
             return { shouldShow: false };
         }
 
-        // If no ICP specified, show all non-promoted posts
+        // If no ICP specified, keep baseline quality filtering active
+        // so users still see filtering behavior after adding a key.
         if (!customICP) {
-            return { shouldShow: true };
+            customICP = 'People in product, engineering, design, AI, startups, founders, operators, and investors sharing practical insights';
         }
 
         // Improved ICP matching prompt with spam and AI detection
