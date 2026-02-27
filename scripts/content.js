@@ -6,8 +6,18 @@ const processedProfiles = new Map();
 let hiddenPostsCount = 0;
 let counterBadge = null;
 
-// Primary selector - LinkedIn's feed post container
-const POST_SELECTOR = '.feed-shared-update-v2__control-menu-container';
+// Selectors tried in order - first one that returns results wins
+const POST_SELECTORS = [
+    '.feed-shared-update-v2__control-menu-container',
+    '.occludable-update',
+    '.feed-shared-update-v2',
+    '[data-urn^="urn:li:activity"]',
+    '[data-urn^="urn:li:ugcPost"]',
+    '[data-urn^="urn:li:share"]',
+];
+
+// Resolved at runtime once we find what works on current LinkedIn DOM
+let resolvedPostSelector = null;
 
 // Listen for messages from popup
 chrome.runtime.onMessage.addListener((request) => {
@@ -180,8 +190,18 @@ function extractProfileData(postElement) {
     };
 }
 
+function getPostContainer(postElement) {
+    if (resolvedPostSelector) {
+        return postElement.closest(resolvedPostSelector) || postElement;
+    }
+    return postElement.closest('[data-urn]') ||
+           postElement.closest('.feed-shared-update-v2') ||
+           postElement.closest('.occludable-update') ||
+           postElement;
+}
+
 function removePost(postElement) {
-    const parent = postElement.closest(POST_SELECTOR) || postElement;
+    const parent = getPostContainer(postElement);
     if (parent.dataset.removed === 'true') return;
     parent.dataset.removed = 'true';
 
@@ -199,7 +219,7 @@ function removePost(postElement) {
 }
 
 function blurPost(postElement) {
-    const parent = postElement.closest(POST_SELECTOR) || postElement;
+    const parent = getPostContainer(postElement);
     if (parent.dataset.blurred === 'true') return;
     parent.dataset.blurred = 'true';
 
@@ -248,8 +268,53 @@ function blurPost(postElement) {
     parent.appendChild(label);
 }
 
+function resolvePostSelector() {
+    if (resolvedPostSelector) return resolvedPostSelector;
+
+    // Try each candidate selector and use whichever finds posts
+    for (const selector of POST_SELECTORS) {
+        if (document.querySelector(selector)) {
+            resolvedPostSelector = selector;
+            console.log(`[authr] Using post selector: "${selector}"`);
+            return selector;
+        }
+    }
+
+    // Fallback: find posts by their inner actor container and walk up
+    const actors = document.querySelectorAll('.update-components-actor__container');
+    if (actors.length > 0) {
+        console.log('[authr] Falling back to actor-based post detection');
+        return null; // signals to use actor-based path
+    }
+
+    console.warn('[authr] Could not find any post elements. LinkedIn DOM may have changed.');
+    return null;
+}
+
+function collectPosts(root) {
+    const selector = resolvePostSelector();
+
+    if (selector) {
+        return Array.from(root.querySelectorAll?.(selector) || []);
+    }
+
+    // Actor-based fallback: find each actor and return its outermost post container
+    const actors = root.querySelectorAll?.('.update-components-actor__container') || [];
+    const containers = new Set();
+    actors.forEach(actor => {
+        // Walk up looking for a meaningful post wrapper
+        const container =
+            actor.closest('[data-urn]') ||
+            actor.closest('.feed-shared-update-v2') ||
+            actor.closest('.occludable-update') ||
+            actor.parentElement?.parentElement?.parentElement;
+        if (container) containers.add(container);
+    });
+    return Array.from(containers);
+}
+
 function processExistingPosts() {
-    const posts = document.querySelectorAll(POST_SELECTOR);
+    const posts = collectPosts(document);
     console.log(`[authr] Found ${posts.length} posts to scan`);
     posts.forEach(processPost);
 }
@@ -259,10 +324,8 @@ function observeNewPosts() {
         mutations.forEach(m => {
             m.addedNodes.forEach(node => {
                 if (node.nodeType === 1) {
-                    const newPosts = node.querySelectorAll?.(POST_SELECTOR);
-                    if (newPosts?.length) newPosts.forEach(processPost);
-                    // Also check if node itself is a post container
-                    if (node.matches?.(POST_SELECTOR)) processPost(node);
+                    const newPosts = collectPosts(node);
+                    if (newPosts.length) newPosts.forEach(processPost);
                 }
             });
         });
@@ -272,7 +335,7 @@ function observeNewPosts() {
 }
 
 function unblurAllPosts() {
-    document.querySelectorAll(`${POST_SELECTOR}[data-blurred="true"]`).forEach(parent => {
+    document.querySelectorAll('[data-blurred="true"]').forEach(parent => {
         const wrapper = parent.querySelector('div[style*="filter"]');
         if (wrapper) wrapper.style.filter = '';
         parent.querySelector('button')?.remove();
