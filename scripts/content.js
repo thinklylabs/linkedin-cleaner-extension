@@ -15,9 +15,11 @@ const POST_SELECTORS = [
     '[data-urn^="urn:li:ugcPost"]',
     '[data-urn^="urn:li:share"]',
 ];
+const COMMENTARY_NODE_SELECTOR = '[data-view-name="feed-commentary"], [data-testid="feed-expandable-text-box"]';
 
 // Resolved at runtime once we find what works on current LinkedIn DOM
 let resolvedPostSelector = null;
+let loggedMissingSelectors = false;
 
 // Listen for messages from popup
 chrome.runtime.onMessage.addListener((request) => {
@@ -280,15 +282,54 @@ function resolvePostSelector() {
         }
     }
 
-    // Fallback: find posts by their inner actor container and walk up
+    // Fallback: modern LinkedIn renders commentary nodes with hashed classes.
+    // We'll derive post containers from those nodes in collectPosts().
+    const commentaryNodes = document.querySelectorAll(COMMENTARY_NODE_SELECTOR);
+    if (commentaryNodes.length > 0) {
+        return null; // signals to use commentary-based collection path
+    }
+
+    // Last fallback: find posts by their inner actor container and walk up
     const actors = document.querySelectorAll('.update-components-actor__container');
     if (actors.length > 0) {
         console.log('[authr] Falling back to actor-based post detection');
         return null; // signals to use actor-based path
     }
 
-    console.warn('[authr] Could not find any post elements. LinkedIn DOM may have changed.');
+    if (!loggedMissingSelectors) {
+        console.warn('[authr] Could not find any post elements. LinkedIn DOM may have changed.');
+        loggedMissingSelectors = true;
+    }
     return null;
+}
+
+function findPostContainerFromCommentaryNode(textNode) {
+    let current = textNode;
+
+    // Walk up the tree to find the smallest likely post container.
+    for (let depth = 0; depth < 14 && current; depth++) {
+        if (current === document.body) break;
+
+        const hasActor =
+            !!current.querySelector('.update-components-actor__container') ||
+            !!current.querySelector('[data-view-name="feed-actor-name"]') ||
+            !!current.querySelector('a[href*="/in/"]');
+
+        const commentaryCount = current.querySelectorAll(COMMENTARY_NODE_SELECTOR).length;
+
+        if (hasActor && commentaryCount === 1) {
+            return current;
+        }
+
+        // Accept a slightly larger wrapper if the smallest one is noisy.
+        if (hasActor && commentaryCount <= 2 && current.querySelector('button, [aria-label]')) {
+            return current;
+        }
+
+        current = current.parentElement;
+    }
+
+    return textNode.closest('[data-view-name="feed-commentary"]')?.parentElement || textNode.parentElement;
 }
 
 function collectPosts(root) {
@@ -296,6 +337,17 @@ function collectPosts(root) {
 
     if (selector) {
         return Array.from(root.querySelectorAll?.(selector) || []);
+    }
+
+    // Primary fallback for modern LinkedIn: derive post wrappers from commentary blocks.
+    const commentaryNodes = root.querySelectorAll?.(COMMENTARY_NODE_SELECTOR) || [];
+    if (commentaryNodes.length > 0) {
+        const containers = new Set();
+        commentaryNodes.forEach((textNode) => {
+            const container = findPostContainerFromCommentaryNode(textNode);
+            if (container) containers.add(container);
+        });
+        return Array.from(containers);
     }
 
     // Actor-based fallback: find each actor and return its outermost post container
