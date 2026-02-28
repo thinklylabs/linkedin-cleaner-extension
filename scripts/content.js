@@ -55,8 +55,9 @@ async function processPost(postElement) {
     const postHash = profileData.postText ? profileData.postText.substring(0, 100).replace(/\s+/g, ' ') : '';
     const cacheKey = `${profileData.name}_${profileData.headline}_${postHash}`;
     
-    const { customGeminiKey, customICP, postAction, accessToken } = await chrome.storage.local.get([
+    const { customGeminiKey, customGeminiModel, customICP, postAction, accessToken } = await chrome.storage.local.get([
         'customGeminiKey',
+        'customGeminiModel',
         'customICP',
         'postAction',
         'accessToken'
@@ -86,7 +87,7 @@ async function processPost(postElement) {
         
         // Prefer custom Gemini key if available
         if (customGeminiKey) {
-            result = await analyzeWithGemini(profileData, customGeminiKey, customICP);
+            result = await analyzeWithGemini(profileData, customGeminiKey, customGeminiModel, customICP);
         } 
         // Otherwise use authr backend API with access token
         else if (accessToken) {
@@ -420,7 +421,7 @@ function updateCounterBadge() {
     });
 }
 
-async function analyzeWithGemini(profileData, apiKey, customICP) {
+async function analyzeWithGemini(profileData, apiKey, customGeminiModel, customICP) {
     try {
         // Check if user is an authr user (has access token)
         const { accessToken, isAuthrUser } = await chrome.storage.local.get(['accessToken', 'isAuthrUser']);
@@ -431,7 +432,7 @@ async function analyzeWithGemini(profileData, apiKey, customICP) {
         }
 
         // Fall back to direct Gemini API for free users
-        return await analyzeWithDirectGemini(profileData, apiKey, customICP);
+        return await analyzeWithDirectGemini(profileData, apiKey, customGeminiModel, customICP);
     } catch (error) {
         return { shouldShow: true }; // Default to show on error
     }
@@ -459,7 +460,7 @@ async function analyzeWithAuthrAPI(profileData, accessToken) {
     }
 }
 
-async function analyzeWithDirectGemini(profileData, apiKey, customICP) {
+async function analyzeWithDirectGemini(profileData, apiKey, customGeminiModel, customICP) {
     try {
         // Always hide promoted content and job postings
         if (profileData.isPromoted || profileData.isJobPosting) {
@@ -471,31 +472,60 @@ async function analyzeWithDirectGemini(profileData, apiKey, customICP) {
             return { shouldShow: true };
         }
 
-        // Improved ICP matching prompt
+        // Improved ICP matching prompt with spam and AI detection
         const postPreview = profileData.postText ? profileData.postText.substring(0, 400).trim() : '';
         
-        const prompt = `You are filtering LinkedIn posts to show only content from your target audience.
+        const prompt = `You are filtering LinkedIn posts to EXCLUSIVELY show only content from people who match the target audience. Your goal is to create a high-quality, relevant feed.
 
-TARGET AUDIENCE:
+TARGET AUDIENCE (ICP):
 ${customICP}
 
 PROFILE:
 Name: ${profileData.name || 'Unknown'}
 Headline: ${profileData.headline || 'Not available'}
-${postPreview ? `Post: ${postPreview}` : ''}
+${postPreview ? `Post Content: ${postPreview}` : ''}
 
-Question: Does this profile or their post content match the target audience above?
+CRITICAL FILTERING RULES:
 
-Instructions:
-- Compare the profile headline and post content to the target audience description
-- SHOW if the person fits the target audience OR if their post discusses topics relevant to the target audience
-- HIDE if the person clearly doesn't fit AND their post isn't relevant to the target audience
-- Be practical: if there's any reasonable connection, SHOW it
+1. ICP MATCHING (STRICT):
+   - SHOW ONLY if the person's profile (headline, role, industry) clearly matches the target audience description
+   - The person must be in the ICP - do NOT show posts just because the topic is relevant if the person doesn't match
+   - HIDE if the person doesn't fit the ICP, even if their post discusses relevant topics
+
+2. SPAM DETECTION - HIDE if the post contains:
+   - Excessive emojis or special characters (more than 3-4 emojis)
+   - Clickbait phrases ("You won't believe...", "This will shock you...", "Number 3 will amaze you!")
+   - Excessive hashtags (more than 5-7 hashtags)
+   - Repetitive promotional content
+   - "Follow for more" or similar engagement bait
+   - Links to external products/services with aggressive sales language
+   - Posts that are clearly self-promotional without value
+
+3. AI-GENERATED/SLOP DETECTION - HIDE if the post:
+   - Has generic, formulaic structure ("Here are 5 ways...", "3 things you need to know...")
+   - Contains overly polished, corporate-speak language that lacks authenticity
+   - Has repetitive patterns typical of AI-generated content
+   - Lacks personal voice, anecdotes, or genuine insights
+   - Feels like it was written by a template or AI tool
+   - Contains phrases like "In today's fast-paced world..." or similar generic AI patterns
+
+4. QUALITY CHECK:
+   - Even if someone matches ICP, HIDE if their post is spam or AI slop
+   - Prioritize authentic, valuable content from ICP-matched profiles
+
+DECISION PROCESS:
+1. First, check if the person matches the ICP (based on headline/role/industry)
+2. If NO match → HIDE
+3. If YES match → Check for spam indicators → If spam → HIDE
+4. If YES match and not spam → Check for AI slop → If AI slop → HIDE
+5. Only SHOW if: Person matches ICP AND post is not spam AND post is not AI slop
 
 Answer with exactly one word: SHOW or HIDE`;
 
+        const modelName = customGeminiModel || CONFIG.GEMINI_DEFAULT_MODEL;
+        const endpoint = `${CONFIG.GEMINI_API_BASE}/${modelName}:generateContent?key=${encodeURIComponent(apiKey)}`;
         const response = await fetch(
-            `${CONFIG.GEMINI_API_ENDPOINT}?key=${apiKey}`,
+            endpoint,
             {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },

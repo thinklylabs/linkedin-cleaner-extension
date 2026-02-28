@@ -1,8 +1,8 @@
 {
   "manifest_version": 3,
   "name": "Authr Extension",
-  "version": "1.0.0",
-  "description": "Clean your LinkedIn feed with AI-powered filtering",
+  "version": "1.0.3",
+  "description": "Clean your LinkedIn feed to see only the content you want to see.",
   "permissions": [
     "storage",
     "alarms"
@@ -10,12 +10,10 @@
   "host_permissions": [
     "https://www.linkedin.com/feed/*",
     "https://generativelanguage.googleapis.com/*",
-    "http://localhost:3000/*",
     "https://authr-ai.com/*"
   ],
   "externally_connectable": {
     "matches": [
-      "http://localhost:3000/*",
       "https://authr-ai.com/*"
     ]
   },
