@@ -1,11 +1,12 @@
 {
   "manifest_version": 3,
   "name": "Authr Extension",
-  "version": "1.0.3",
+  "version": "1.0.7",
   "description": "Clean your LinkedIn feed to see only the content you want to see.",
   "permissions": [
     "storage",
-    "alarms"
+    "alarms",
+    "tabs"
   ],
   "host_permissions": [
     "https://www.linkedin.com/feed/*",
