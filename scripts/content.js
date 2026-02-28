@@ -5,12 +5,23 @@ const API_BASE = CONFIG.API_BASE_URL;
 const processedProfiles = new Map();
 let hiddenPostsCount = 0;
 let counterBadge = null;
+let feedObserver = null;
+
+// Guard against invalidated extension context (e.g. after extension reload/update)
+function isExtensionContextValid() {
+    try {
+        return !!(chrome.runtime && chrome.runtime.id);
+    } catch (e) {
+        return false;
+    }
+}
 
 // Selectors tried in order - first one that returns results wins
+// 2025 LinkedIn DOM: uses data-view-name attributes; CSS classes are hashed/unstable
 const POST_SELECTORS = [
-    '.feed-shared-update-v2__control-menu-container',
-    '.occludable-update',
+    '[data-view-name="feed-full-update"]',
     '.feed-shared-update-v2',
+    '.occludable-update',
     '[data-urn^="urn:li:activity"]',
     '[data-urn^="urn:li:ugcPost"]',
     '[data-urn^="urn:li:share"]',
@@ -38,6 +49,8 @@ chrome.runtime.onMessage.addListener((request) => {
 });
 
 async function init() {
+    if (!isExtensionContextValid()) return;
+
     const { filterEnabled, customGeminiKey, accessToken } = await chrome.storage.local.get([
         'filterEnabled',
         'customGeminiKey',
@@ -62,6 +75,11 @@ async function init() {
 }
 
 async function processPost(postElement) {
+    if (!isExtensionContextValid()) {
+        // Extension context invalidated; disconnect observer to stop retries
+        if (feedObserver) { feedObserver.disconnect(); feedObserver = null; }
+        return;
+    }
     if (postElement.dataset.profileFiltered) return;
 
     const profileData = extractProfileData(postElement);
@@ -140,40 +158,142 @@ async function processPost(postElement) {
 }
 
 function extractProfileData(postElement) {
-    // Try primary actor container
-    let actor = postElement.querySelector('.update-components-actor__container');
+    const postContainer =
+        postElement.closest('[data-view-name="feed-full-update"]') ||
+        postElement.closest('.feed-shared-update-v2') ||
+        postElement;
 
-    // Fallback: search within parent if not found directly
-    if (!actor) {
-        actor = postElement.closest('.feed-shared-update-v2')
-            ?.querySelector('.update-components-actor__container');
-    }
-
-    if (!actor) return null;
-
-    const nameEl = actor.querySelector('.update-components-actor__title span[aria-hidden="true"]');
-    const headlineEl = actor.querySelector('.update-components-actor__description span[aria-hidden="true"]');
-
-    const postContainer = postElement.closest('.feed-shared-update-v2') || postElement;
-
-    const postTextEl =
-        postContainer.querySelector('.feed-shared-text-view__text-view span[aria-hidden="true"]') ||
-        postContainer.querySelector('.update-components-text span[aria-hidden="true"]') ||
-        postContainer.querySelector('.feed-shared-update-v2__description span[aria-hidden="true"]') ||
-        postContainer.querySelector('.feed-shared-text-view') ||
-        postContainer.querySelector('[data-test-id="main-feed-activity-card__commentary"]');
-
-    let postText = postTextEl ? (postTextEl.innerText || postTextEl.textContent || '').trim() : '';
-
-    const headlineText = headlineEl?.textContent?.toLowerCase() || '';
     const fullText = (postContainer.textContent || '').toLowerCase();
 
-    const isPromoted =
-        headlineText.includes('promoted') ||
-        headlineText.includes('sponsored') ||
-        postContainer.querySelector('.update-components-actor__label')?.textContent.toLowerCase().includes('promoted') ||
+    // --- Detect promoted/ad content early (before name extraction) ---
+    // Ads may not have a standard author profile, so check first
+    const isPromotedEarly =
         !!postContainer.querySelector('[data-ad-banner-container]') ||
         fullText.includes('promoted') ||
+        fullText.includes('sponsored');
+
+    // If this is a promoted post with no actor image, return immediately as ad
+    if (isPromotedEarly && !postContainer.querySelector('[data-view-name="feed-actor-image"]')) {
+        return {
+            name: 'Promoted',
+            headline: 'Sponsored Content',
+            postText: '',
+            isPromoted: true,
+            isJobPosting: false
+        };
+    }
+
+    // --- Extract author name ---
+    let name = '';
+
+    // Strategy 1: img alt inside actor-image link ("View John Doe's profile")
+    const actorImg = postContainer.querySelector('[data-view-name="feed-actor-image"] img[alt]');
+    if (actorImg) {
+        const alt = actorImg.getAttribute('alt') || '';
+        const match = alt.match(/^View (.+?)(?:'s|'s|\u2019s) profile$/i);
+        if (match) name = match[1].trim();
+    }
+
+    // Strategy 2: aria-label on actor image link
+    if (!name) {
+        const actorLink = postContainer.querySelector('[data-view-name="feed-actor-image"]');
+        const figureLabel = actorLink?.querySelector('figure[aria-label]');
+        if (figureLabel) {
+            const label = figureLabel.getAttribute('aria-label') || '';
+            const match = label.match(/^View (.+?)(?:'s|'s|\u2019s) profile$/i);
+            if (match) name = match[1].trim();
+        }
+    }
+
+    // Strategy 3: aria-label on any ancestor div near the actor area
+    if (!name) {
+        const ariaEls = postContainer.querySelectorAll('[aria-label]');
+        for (const el of ariaEls) {
+            const label = el.getAttribute('aria-label') || '';
+            const match = label.match(/^View (.+?)(?:'s|'s|\u2019s) profile$/i);
+            if (match) { name = match[1].trim(); break; }
+        }
+    }
+
+    // Strategy 4 (legacy): old class-based selectors
+    if (!name) {
+        const oldNameEl = postContainer.querySelector('.update-components-actor__title span[aria-hidden="true"]');
+        if (oldNameEl) name = oldNameEl.textContent.trim();
+    }
+
+    // If we still can't find a name, check if it's a promoted post anyway
+    if (!name) {
+        if (isPromotedEarly) {
+            return {
+                name: 'Promoted',
+                headline: 'Sponsored Content',
+                postText: '',
+                isPromoted: true,
+                isJobPosting: false
+            };
+        }
+        return null;
+    }
+
+    // --- Extract headline ---
+    let headline = '';
+
+    // Strategy 1: second link to the same profile often contains name + headline
+    const actorImageLink = postContainer.querySelector('[data-view-name="feed-actor-image"]');
+    const profileHref = actorImageLink?.getAttribute('href') || '';
+    if (profileHref) {
+        // Find all links pointing to same profile — the non-image one has the text info
+        const profileLinks = postContainer.querySelectorAll(`a[href="${profileHref}"]`);
+        for (const link of profileLinks) {
+            if (link.getAttribute('data-view-name') === 'feed-actor-image') continue;
+            // The aria-label on child divs often has "Name · Headline · Connection"
+            const labelEl = link.querySelector('[aria-label]');
+            if (labelEl) {
+                const parts = (labelEl.getAttribute('aria-label') || '').split(/[·•]/); // split on middle dot
+                if (parts.length >= 2) {
+                    // Remove the name part and connection degree, keep the headline
+                    headline = parts.slice(1).map(p => p.trim()).filter(p => {
+                        const lower = p.toLowerCase();
+                        return p.length > 2 && !lower.includes('1st') && !lower.includes('2nd') && !lower.includes('3rd') && !lower.includes('follower') && !lower.includes('premium');
+                    }).join(' · ');
+                    break;
+                }
+            }
+            // Fallback: use raw text content of the non-image link
+            if (!headline) {
+                const rawText = link.textContent.trim();
+                // Remove the name from the text to isolate the headline
+                headline = rawText.replace(name, '').replace(/^\s*[·•]\s*/, '').trim();
+            }
+            break;
+        }
+    }
+
+    // Strategy 2 (legacy): old class-based selector
+    if (!headline) {
+        const oldHeadlineEl = postContainer.querySelector('.update-components-actor__description span[aria-hidden="true"]');
+        if (oldHeadlineEl) headline = oldHeadlineEl.textContent.trim();
+    }
+
+    // --- Extract post text ---
+    const commentaryEl = postContainer.querySelector('[data-view-name="feed-commentary"]');
+    let postText = '';
+    if (commentaryEl) {
+        postText = (commentaryEl.innerText || commentaryEl.textContent || '').trim();
+    } else {
+        // Legacy fallbacks
+        const legacyTextEl =
+            postContainer.querySelector('.feed-shared-text-view__text-view span[aria-hidden="true"]') ||
+            postContainer.querySelector('.update-components-text span[aria-hidden="true"]') ||
+            postContainer.querySelector('.feed-shared-text-view');
+        if (legacyTextEl) postText = (legacyTextEl.innerText || legacyTextEl.textContent || '').trim();
+    }
+
+    const headlineLower = headline.toLowerCase();
+
+    const isPromoted = isPromotedEarly ||
+        headlineLower.includes('promoted') ||
+        headlineLower.includes('sponsored') ||
         postText.toLowerCase().includes('sponsored');
 
     const isJobPosting =
@@ -181,11 +301,11 @@ function extractProfileData(postElement) {
         !!postContainer.querySelector('[data-job-id]') ||
         postText.toLowerCase().includes('we are hiring') ||
         postText.toLowerCase().includes('join our team') ||
-        headlineText.includes('recruiter');
+        headlineLower.includes('recruiter');
 
     return {
-        name: nameEl?.textContent.trim() || '',
-        headline: headlineEl?.textContent.trim() || '',
+        name,
+        headline,
         postText: postText.substring(0, 500),
         isPromoted,
         isJobPosting
@@ -193,13 +313,17 @@ function extractProfileData(postElement) {
 }
 
 function getPostContainer(postElement) {
-    if (resolvedPostSelector) {
-        return postElement.closest(resolvedPostSelector) || postElement;
+    // The feed-full-update is just the post content; its parent is the full card
+    // (including reactions and comments). We want the full card.
+    const feedUpdate = postElement.closest('[data-view-name="feed-full-update"]');
+    if (feedUpdate && feedUpdate.parentElement && feedUpdate.parentElement !== document.body) {
+        return feedUpdate.parentElement;
     }
-    return postElement.closest('[data-urn]') ||
-           postElement.closest('.feed-shared-update-v2') ||
-           postElement.closest('.occludable-update') ||
-           postElement;
+    return (resolvedPostSelector ? postElement.closest(resolvedPostSelector) : null) ||
+        postElement.closest('[data-urn]') ||
+        postElement.closest('.feed-shared-update-v2') ||
+        postElement.closest('.occludable-update') ||
+        postElement;
 }
 
 function removePost(postElement) {
@@ -221,17 +345,24 @@ function removePost(postElement) {
 }
 
 function blurPost(postElement) {
-    const parent = getPostContainer(postElement);
-    if (parent.dataset.blurred === 'true') return;
-    parent.dataset.blurred = 'true';
+    const target = getPostContainer(postElement);
+    if (target.dataset.blurred === 'true') return;
+    target.dataset.blurred = 'true';
 
     hiddenPostsCount++;
     updateCounterBadge();
 
+    // Wrap the target in a relative container so the button sits on top
     const wrapper = document.createElement('div');
-    while (parent.firstChild) wrapper.appendChild(parent.firstChild);
-    wrapper.style.filter = 'blur(10px)';
-    wrapper.style.transition = 'all 0.3s ease';
+    wrapper.style.cssText = 'position:relative;';
+    wrapper.dataset.authrWrapper = 'true';
+    target.parentNode.insertBefore(wrapper, target);
+    wrapper.appendChild(target);
+
+    // Blur the entire card (post + reactions + comments)
+    target.style.filter = 'blur(10px)';
+    target.style.transition = 'filter 0.3s ease';
+    target.style.pointerEvents = 'none';
 
     const btn = document.createElement('button');
     btn.innerHTML = `<span style="display:flex;align-items:center;gap:8px;white-space:nowrap;"><span>View Post</span></span>`;
@@ -245,7 +376,7 @@ function blurPost(postElement) {
         box-shadow:0 2px 8px rgba(26,179,148,0.3);transition:all 0.2s ease;
     `;
     btn.onmouseover = () => { btn.style.background = '#0D9488'; btn.style.transform = 'translate(-50%,-50%) scale(1.05)'; };
-    btn.onmouseout  = () => { btn.style.background = '#37a791e8'; btn.style.transform = 'translate(-50%,-50%)'; };
+    btn.onmouseout = () => { btn.style.background = '#37a791e8'; btn.style.transform = 'translate(-50%,-50%)'; };
 
     const label = document.createElement('span');
     label.innerHTML = `<span style="opacity:0.9;font-size:13px;font-weight:300;color:rgba(255,255,255,0.7);">Hidden by <span style="color:#fff;font-weight:500;">authr</span></span>`;
@@ -256,18 +387,18 @@ function blurPost(postElement) {
     `;
 
     btn.onclick = () => {
-        wrapper.style.filter = '';
+        target.style.filter = '';
+        target.style.pointerEvents = '';
         btn.remove();
         label.remove();
-        parent.dataset.revealed = 'true';
+        target.dataset.revealed = 'true';
         hiddenPostsCount--;
         updateCounterBadge();
     };
 
-    parent.style.position = 'relative';
-    parent.appendChild(wrapper);
-    parent.appendChild(btn);
-    parent.appendChild(label);
+    // Button and label are children of wrapper (NOT blurred target)
+    wrapper.appendChild(btn);
+    wrapper.appendChild(label);
 }
 
 function resolvePostSelector() {
@@ -282,18 +413,17 @@ function resolvePostSelector() {
         }
     }
 
-    // Fallback: modern LinkedIn renders commentary nodes with hashed classes.
-    // We'll derive post containers from those nodes in collectPosts().
+    // Fallback: derive post containers from commentary or actor-image nodes.
     const commentaryNodes = document.querySelectorAll(COMMENTARY_NODE_SELECTOR);
     if (commentaryNodes.length > 0) {
         return null; // signals to use commentary-based collection path
     }
 
-    // Last fallback: find posts by their inner actor container and walk up
-    const actors = document.querySelectorAll('.update-components-actor__container');
-    if (actors.length > 0) {
-        console.log('[authr] Falling back to actor-based post detection');
-        return null; // signals to use actor-based path
+    // Actor-image based fallback (2025 DOM)
+    const actorImages = document.querySelectorAll('[data-view-name="feed-actor-image"]');
+    if (actorImages.length > 0) {
+        console.log('[authr] Falling back to actor-image-based post detection');
+        return null;
     }
 
     if (!loggedMissingSelectors) {
@@ -304,6 +434,10 @@ function resolvePostSelector() {
 }
 
 function findPostContainerFromCommentaryNode(textNode) {
+    // Prefer the new data-view-name container if available
+    const feedUpdate = textNode.closest('[data-view-name="feed-full-update"]');
+    if (feedUpdate) return feedUpdate;
+
     let current = textNode;
 
     // Walk up the tree to find the smallest likely post container.
@@ -311,8 +445,8 @@ function findPostContainerFromCommentaryNode(textNode) {
         if (current === document.body) break;
 
         const hasActor =
+            !!current.querySelector('[data-view-name="feed-actor-image"]') ||
             !!current.querySelector('.update-components-actor__container') ||
-            !!current.querySelector('[data-view-name="feed-actor-name"]') ||
             !!current.querySelector('a[href*="/in/"]');
 
         const commentaryCount = current.querySelectorAll(COMMENTARY_NODE_SELECTOR).length;
@@ -339,7 +473,7 @@ function collectPosts(root) {
         return Array.from(root.querySelectorAll?.(selector) || []);
     }
 
-    // Primary fallback for modern LinkedIn: derive post wrappers from commentary blocks.
+    // Primary fallback: derive post wrappers from commentary blocks.
     const commentaryNodes = root.querySelectorAll?.(COMMENTARY_NODE_SELECTOR) || [];
     if (commentaryNodes.length > 0) {
         const containers = new Set();
@@ -350,11 +484,24 @@ function collectPosts(root) {
         return Array.from(containers);
     }
 
-    // Actor-based fallback: find each actor and return its outermost post container
+    // Actor-image fallback (2025 DOM): walk up from actor images
+    const actorImages = root.querySelectorAll?.('[data-view-name="feed-actor-image"]') || [];
+    if (actorImages.length > 0) {
+        const containers = new Set();
+        actorImages.forEach(actor => {
+            const container =
+                actor.closest('[data-view-name="feed-full-update"]') ||
+                actor.closest('[data-urn]') ||
+                actor.parentElement?.parentElement?.parentElement;
+            if (container) containers.add(container);
+        });
+        return Array.from(containers);
+    }
+
+    // Legacy actor-based fallback
     const actors = root.querySelectorAll?.('.update-components-actor__container') || [];
     const containers = new Set();
     actors.forEach(actor => {
-        // Walk up looking for a meaningful post wrapper
         const container =
             actor.closest('[data-urn]') ||
             actor.closest('.feed-shared-update-v2') ||
@@ -372,7 +519,16 @@ function processExistingPosts() {
 }
 
 function observeNewPosts() {
-    const observer = new MutationObserver(mutations => {
+    // Disconnect any existing observer before creating a new one
+    if (feedObserver) { feedObserver.disconnect(); feedObserver = null; }
+
+    feedObserver = new MutationObserver(mutations => {
+        if (!isExtensionContextValid()) {
+            feedObserver.disconnect();
+            feedObserver = null;
+            console.warn('[authr] Extension context invalidated — observer disconnected.');
+            return;
+        }
         mutations.forEach(m => {
             m.addedNodes.forEach(node => {
                 if (node.nodeType === 1) {
@@ -382,17 +538,28 @@ function observeNewPosts() {
             });
         });
     });
-    observer.observe(document.body, { childList: true, subtree: true });
+    feedObserver.observe(document.body, { childList: true, subtree: true });
     console.log('[authr] Observer attached');
 }
 
 function unblurAllPosts() {
-    document.querySelectorAll('[data-blurred="true"]').forEach(parent => {
-        const wrapper = parent.querySelector('div[style*="filter"]');
-        if (wrapper) wrapper.style.filter = '';
-        parent.querySelector('button')?.remove();
-        parent.dataset.blurred = 'false';
-        parent.dataset.revealed = 'true';
+    document.querySelectorAll('[data-blurred="true"]').forEach(target => {
+        // Remove blur and restore interaction
+        target.style.filter = '';
+        target.style.pointerEvents = '';
+        target.dataset.blurred = 'false';
+        target.dataset.revealed = 'true';
+
+        // Remove View Post button and label from wrapper
+        const wrapper = target.closest('[data-authr-wrapper]');
+        if (wrapper) {
+            wrapper.querySelectorAll('button, span').forEach(el => {
+                if (el.parentElement === wrapper) el.remove();
+            });
+            // Unwrap: move card back to original position
+            wrapper.parentNode.insertBefore(target, wrapper);
+            wrapper.remove();
+        }
     });
     hiddenPostsCount = 0;
     updateCounterBadge();
@@ -430,7 +597,7 @@ function createCounterBadge() {
     const closeBtn = document.getElementById('authr-counter-close');
     if (closeBtn) {
         closeBtn.onmouseover = () => closeBtn.style.opacity = '1';
-        closeBtn.onmouseout  = () => closeBtn.style.opacity = '0.7';
+        closeBtn.onmouseout = () => closeBtn.style.opacity = '0.7';
         closeBtn.onclick = () => {
             counterBadge.style.display = 'none';
             chrome.storage.local.set({ showCounter: false });
@@ -439,7 +606,7 @@ function createCounterBadge() {
 }
 
 function updateCounterBadge() {
-    if (!counterBadge) return;
+    if (!counterBadge || !isExtensionContextValid()) return;
     chrome.storage.local.get(['showCounter'], ({ showCounter }) => {
         if (showCounter === false) {
             counterBadge.style.display = 'none';
