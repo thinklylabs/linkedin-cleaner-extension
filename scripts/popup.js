@@ -143,7 +143,6 @@ async function validateGeminiKey(apiKey) {
 
     return { isValid: true, model: modelResult.model, error: null };
   } catch (error) {
-    console.error('API validation error:', error);
     return { isValid: false, model: null, error: 'Network error while validating API key' };
   }
 }

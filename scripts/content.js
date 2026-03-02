@@ -30,7 +30,6 @@ const COMMENTARY_NODE_SELECTOR = '[data-view-name="feed-commentary"], [data-test
 
 // Resolved at runtime once we find what works on current LinkedIn DOM
 let resolvedPostSelector = null;
-let loggedMissingSelectors = false;
 
 // Listen for messages from popup
 chrome.runtime.onMessage.addListener((request) => {
@@ -41,7 +40,6 @@ chrome.runtime.onMessage.addListener((request) => {
             unblurAllPosts();
         }
     } else if (request.action === 'AUTH_COMPLETE' || request.action === 'SETTINGS_UPDATED') {
-        console.log('[authr] Settings updated, reinitializing...');
         hiddenPostsCount = 0;
         updateCounterBadge();
         init();
@@ -57,15 +55,11 @@ async function init() {
         'accessToken'
     ]);
 
-    console.log('[authr] init() — key:', !!customGeminiKey, '| token:', !!accessToken, '| filterEnabled:', filterEnabled);
-
     if (!customGeminiKey && !accessToken) {
-        console.warn('[authr] No API key or access token. Open extension popup to add your Gemini key.');
         return;
     }
 
     if (filterEnabled === false) {
-        console.log('[authr] Filtering is disabled.');
         return;
     }
 
@@ -130,13 +124,11 @@ async function processPost(postElement) {
             });
 
             if (response.status === 401) {
-                console.warn('[authr] Access token expired. Clearing auth state.');
                 await chrome.storage.local.remove(['accessToken', 'refreshToken', 'expiresAt']);
                 return;
             }
 
             if (!response.ok) {
-                console.error('[authr] Backend API error:', response.status);
                 return;
             }
 
@@ -145,16 +137,12 @@ async function processPost(postElement) {
 
         if (!result) return;
 
-        console.log(`[authr] "${profileData.name}" (${profileData.headline.substring(0, 40)}) → ${result.shouldShow ? 'SHOW' : 'HIDE'}`);
-
         processedProfiles.set(cacheKey, result.shouldShow);
 
         if (!result.shouldShow) {
             action === 'remove' ? removePost(postElement) : blurPost(postElement);
         }
-    } catch (error) {
-        console.error('[authr] processPost error:', error);
-    }
+    } catch (error) {}
 }
 
 function extractProfileData(postElement) {
@@ -408,7 +396,6 @@ function resolvePostSelector() {
     for (const selector of POST_SELECTORS) {
         if (document.querySelector(selector)) {
             resolvedPostSelector = selector;
-            console.log(`[authr] Using post selector: "${selector}"`);
             return selector;
         }
     }
@@ -422,14 +409,9 @@ function resolvePostSelector() {
     // Actor-image based fallback (2025 DOM)
     const actorImages = document.querySelectorAll('[data-view-name="feed-actor-image"]');
     if (actorImages.length > 0) {
-        console.log('[authr] Falling back to actor-image-based post detection');
         return null;
     }
 
-    if (!loggedMissingSelectors) {
-        console.warn('[authr] Could not find any post elements. LinkedIn DOM may have changed.');
-        loggedMissingSelectors = true;
-    }
     return null;
 }
 
@@ -514,7 +496,6 @@ function collectPosts(root) {
 
 function processExistingPosts() {
     const posts = collectPosts(document);
-    console.log(`[authr] Found ${posts.length} posts to scan`);
     posts.forEach(processPost);
 }
 
@@ -526,7 +507,6 @@ function observeNewPosts() {
         if (!isExtensionContextValid()) {
             feedObserver.disconnect();
             feedObserver = null;
-            console.warn('[authr] Extension context invalidated — observer disconnected.');
             return;
         }
         mutations.forEach(m => {
@@ -539,7 +519,6 @@ function observeNewPosts() {
         });
     });
     feedObserver.observe(document.body, { childList: true, subtree: true });
-    console.log('[authr] Observer attached');
 }
 
 function unblurAllPosts() {
@@ -629,10 +608,7 @@ async function analyzeWithGemini(profileData, apiKey, customGeminiModel, customI
             return await analyzeWithAuthrAPI(profileData, accessToken);
         }
         return await analyzeWithDirectGemini(profileData, apiKey, customGeminiModel, customICP);
-    } catch (error) {
-        console.error('[authr] analyzeWithGemini error:', error);
-        return { shouldShow: true };
-    }
+    } catch (error) { return { shouldShow: true }; }
 }
 
 async function analyzeWithAuthrAPI(profileData, accessToken) {
@@ -648,10 +624,7 @@ async function analyzeWithAuthrAPI(profileData, accessToken) {
         if (!response.ok) return { shouldShow: true };
         const data = await response.json();
         return { shouldShow: data.shouldShow };
-    } catch (error) {
-        console.error('[authr] analyzeWithAuthrAPI error:', error);
-        return { shouldShow: true };
-    }
+    } catch (error) { return { shouldShow: true }; }
 }
 
 async function analyzeWithDirectGemini(profileData, apiKey, customGeminiModel, customICP) {
@@ -713,8 +686,7 @@ Answer with exactly one word: SHOW or HIDE`;
         });
 
         if (!response.ok) {
-            const err = await response.json().catch(() => ({}));
-            console.error('[authr] Gemini API error:', response.status, err?.error?.message || '');
+            await response.json().catch(() => ({}));
             return { shouldShow: true };
         }
 
@@ -726,10 +698,7 @@ Answer with exactly one word: SHOW or HIDE`;
         else if (responseText.includes('SHOW')) shouldShow = true;
 
         return { shouldShow };
-    } catch (error) {
-        console.error('[authr] analyzeWithDirectGemini error:', error);
-        return { shouldShow: true };
-    }
+    } catch (error) { return { shouldShow: true }; }
 }
 
 // Initialize
