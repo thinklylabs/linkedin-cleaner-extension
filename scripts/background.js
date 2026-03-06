@@ -12,15 +12,20 @@ chrome.runtime.onMessageExternal.addListener(
                 accessToken: request.accessToken,
                 refreshToken: request.refreshToken,
                 expiresAt: request.expiresAt,
-                isAuthrUser: true
+                isAuthrUser: true,
+                filterEnabled: true,
+                postAction: 'blur',
+                showCounter: true
             }, () => {
-                // Notify all LinkedIn tabs to start filtering
-                chrome.tabs.query({ url: 'https://www.linkedin.com/feed/*' }, (tabs) => {
-                    tabs.forEach(tab => {
-                        chrome.tabs.sendMessage(tab.id, {
-                            action: 'AUTH_COMPLETE',
-                            message: 'Authentication successful, you can now start filtering'
-                        }).catch(() => {});
+                chrome.storage.local.remove(['customGeminiKey', 'customGeminiModel'], () => {
+                    // Notify all LinkedIn tabs to start filtering
+                    chrome.tabs.query({ url: 'https://www.linkedin.com/feed/*' }, (tabs) => {
+                        tabs.forEach(tab => {
+                            chrome.tabs.sendMessage(tab.id, {
+                                action: 'AUTH_COMPLETE',
+                                message: 'Authentication successful, you can now start filtering'
+                            }).catch(() => {});
+                        });
                     });
                 });
 

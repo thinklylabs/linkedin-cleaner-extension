@@ -31,7 +31,14 @@ const COMMENTARY_NODE_SELECTOR = '[data-view-name="feed-commentary"], [data-test
 // Resolved at runtime once we find what works on current LinkedIn DOM
 let resolvedPostSelector = null;
 
-// Listen for messages from popup
+function resetProcessingState() {
+    processedProfiles.clear();
+    document.querySelectorAll('[data-profile-filtered]').forEach((el) => {
+        delete el.dataset.profileFiltered;
+    });
+}
+
+// Listen for messages from popup/background
 chrome.runtime.onMessage.addListener((request) => {
     if (request.action === 'TOGGLE_FILTER') {
         if (request.enabled) {
@@ -39,10 +46,42 @@ chrome.runtime.onMessage.addListener((request) => {
         } else {
             unblurAllPosts();
         }
-    } else if (request.action === 'AUTH_COMPLETE' || request.action === 'SETTINGS_UPDATED') {
-        hiddenPostsCount = 0;
-        updateCounterBadge();
-        init();
+        return;
+    }
+
+    if (request.action === 'AUTH_COMPLETE' || request.action === 'SETTINGS_UPDATED') {
+        chrome.storage.local.get(['customGeminiKey', 'accessToken', 'filterEnabled'], ({ customGeminiKey, accessToken, filterEnabled }) => {
+            const hasCredentials = !!(customGeminiKey || accessToken);
+            const isEnabled = filterEnabled !== false;
+
+            if (!hasCredentials || !isEnabled) {
+                unblurAllPosts();
+                resetProcessingState();
+                if (feedObserver) {
+                    feedObserver.disconnect();
+                    feedObserver = null;
+                }
+                return;
+            }
+
+            resetProcessingState();
+            hiddenPostsCount = 0;
+            updateCounterBadge();
+            init();
+        });
+    }
+});
+
+chrome.storage.onChanged.addListener((changes, areaName) => {
+    if (areaName !== 'local') return;
+    if (
+        changes.customGeminiKey ||
+        changes.accessToken ||
+        changes.filterEnabled ||
+        changes.customICP ||
+        changes.postAction
+    ) {
+        chrome.runtime.sendMessage({ action: 'SETTINGS_UPDATED' }).catch(() => {});
     }
 });
 
@@ -83,8 +122,6 @@ async function processPost(postElement) {
         return;
     }
 
-    postElement.dataset.profileFiltered = 'true';
-
     const postHash = profileData.postText ? profileData.postText.substring(0, 100).replace(/\s+/g, ' ') : '';
     const cacheKey = `${profileData.name}_${profileData.headline}_${postHash}`;
 
@@ -97,6 +134,8 @@ async function processPost(postElement) {
     ]);
 
     if (!customGeminiKey && !accessToken) return;
+
+    postElement.dataset.profileFiltered = 'true';
 
     const action = postAction || 'blur';
 
@@ -344,6 +383,7 @@ function blurPost(postElement) {
     const wrapper = document.createElement('div');
     wrapper.style.cssText = 'position:relative;';
     wrapper.dataset.authrWrapper = 'true';
+    wrapper.setAttribute('data-authr-wrapper', 'true');
     target.parentNode.insertBefore(wrapper, target);
     wrapper.appendChild(target);
 

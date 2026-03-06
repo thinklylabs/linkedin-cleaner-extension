@@ -244,8 +244,10 @@ document.addEventListener('DOMContentLoaded', () => {
       customGeminiModel: validation.model || CONFIG.GEMINI_DEFAULT_MODEL,
       filterEnabled: true,
       postAction: 'blur',
-      showCounter: true
+      showCounter: true,
+      isAuthrUser: false
     });
+    await chrome.storage.local.remove(['accessToken', 'refreshToken', 'expiresAt']);
 
     showStatus('key-status-msg', 'Saved! Redirecting...', 'success');
 
@@ -371,7 +373,17 @@ document.addEventListener('DOMContentLoaded', () => {
   // Settings screen - Sign out (for authr users)
   document.getElementById('signout-btn')?.addEventListener('click', async () => {
     if (confirm('Sign out from authr? You\'ll need to sign in again to use the extension.')) {
-      await chrome.storage.local.clear();
+      await chrome.storage.local.remove([
+        'accessToken',
+        'refreshToken',
+        'expiresAt',
+        'isAuthrUser',
+        'filterEnabled',
+        'postAction',
+        'showCounter',
+        'customICP'
+      ]);
+      notifyContentScripts();
 
       document.getElementById('api-key-input').value = '';
       document.getElementById('icp-input').value = '';
@@ -389,7 +401,19 @@ document.addEventListener('DOMContentLoaded', () => {
   // Settings screen - Remove API key (for free users)
   document.getElementById('remove-key-btn')?.addEventListener('click', async () => {
     if (confirm('Remove your API key? You\'ll need to add it again to use the extension.')) {
-      await chrome.storage.local.clear();
+      await chrome.storage.local.remove([
+        'customGeminiKey',
+        'customGeminiModel',
+        'isAuthrUser',
+        'accessToken',
+        'refreshToken',
+        'expiresAt',
+        'filterEnabled',
+        'postAction',
+        'showCounter',
+        'customICP'
+      ]);
+      notifyContentScripts();
 
       document.getElementById('api-key-input').value = '';
       document.getElementById('icp-input').value = '';
@@ -408,6 +432,7 @@ document.addEventListener('DOMContentLoaded', () => {
   document.getElementById('clear-btn')?.addEventListener('click', async () => {
     if (confirm('Are you sure you want to clear all settings? This will sign you out.')) {
       await chrome.storage.local.clear();
+      notifyContentScripts();
 
       document.getElementById('api-key-input').value = '';
       document.getElementById('icp-input').value = '';
